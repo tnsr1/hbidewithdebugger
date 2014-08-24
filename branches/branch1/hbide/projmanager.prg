@@ -1758,7 +1758,7 @@ METHOD IdeProjManager:GetCurrentExeName( cProject )
    RETURN cTargetFN
    
 METHOD IdeProjManager:LaunchDebug( cProject )
-   LOCAL cExe, a_
+   LOCAL cExe
    IF empty( cProject )
       cProject := ::getCurrentProjectTitle()
    ENDIF
@@ -1771,9 +1771,6 @@ METHOD IdeProjManager:LaunchDebug( cProject )
    ::oIde:oDebugger = clsDebugger():New(::oIde)
    ::oIde:oDebugger:cCurrentProject := cProject
    ::oIde:oDebugger:aSources := ::getSourcesByProjectTitle( cProject )
-   FOR EACH a_ IN ::oIde:oDebugger:aSources
-      ?a_
-   NEXT
    cExe := ::GetCurrentExeName( cProject )
    IF ! hb_FileExists( cExe )
       ::oOutputResult:oWidget:append( "Launch error: file not found - " + cExe )
