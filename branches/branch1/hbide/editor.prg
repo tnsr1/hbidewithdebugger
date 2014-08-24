@@ -1632,6 +1632,12 @@ METHOD IdeEditor:destroy()
    /* This code is reached under normal circumstances, so delete auto saved file */
    ferase( hbide_pathToOSPath( ::cPath + ::cFile + ::cExt + ".tmp" ) )
 
+   IF !Empty(::oIde:oDebugger)
+      IF !Empty(::oIde:oDebugger:cAppName)
+         ::oIde:oDebugger:ClearBreakPoints( ::cFile + ::cExt )
+      ENDIF
+   ENDIF
+   
    DO WHILE Len( ::aEdits ) > 0
       oEdit := ::aEdits[ 1 ]
       hb_adel( ::aEdits, 1, .t. )
