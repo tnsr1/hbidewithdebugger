@@ -2098,7 +2098,7 @@ void HBQPlainTextEdit::hbBreakPoints( int block )
 
 /*----------------------------------------------------------------------*/
 
-QVector<int> HBQPlainTextEdit::GetBreakPoinsVector()
+QVector<int> HBQPlainTextEdit::GetBreakPointsVector()
 {
     return BreakPointsVector;
 }
