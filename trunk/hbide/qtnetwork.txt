@@ -1,0 +1,16 @@
+#
+# $Id: qtnetwork.txt 34 2012-10-13 21:57:41Z bedipritpal $
+#
+
+-pflag=-qtver=0x040500
+-pflag=-qtmodule=qtnetwork
+-pflag=-qthdocdir=../doc/
+
+QFtp.qth
+QHttp.qth
+QHttpHeader.qth
+QHttpRequestHeader.qth
+QHttpResponseHeader.qth
+QNetworkRequest.qth
+QNetworkProxy.qth
+QUrlInfo.qth
