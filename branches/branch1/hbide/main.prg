@@ -819,6 +819,7 @@ METHOD HbIde:execAction( cKey )
    CASE "NewProject"
    CASE "LoadProject"
    CASE "LaunchProject"
+   CASE "LaunchDebug"
    CASE "RunAsScript"
    CASE "BuildSource"
    CASE "Build"
@@ -1011,6 +1012,9 @@ METHOD HbIde:execProjectAction( cKey )
       EXIT
    CASE "LaunchProject"
       ::oPM:launchProject()
+      EXIT
+   CASE "LaunchDebug"
+      ::oPM:launchDebug()
       EXIT
    CASE "RunAsScript"
       ::oPM:runAsScript( .t. )

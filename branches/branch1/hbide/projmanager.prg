@@ -251,6 +251,8 @@ CLASS IdeProjManager INHERIT IdeObject
    METHOD promptForPath( oEditPath, cTitle, cObjFileName )
    METHOD buildSource( lExecutable )
    METHOD buildProject( cProject, lLaunch, lRebuild, lPPO, lViaQt, cWrkEnviron )
+   METHOD GetCurrentExeName( cProject )
+   METHOD LaunchDebug( cProject )
    METHOD launchProject( cProject, cExe, cWrkEnviron )
    METHOD showOutput( cOutput, mp2, oProcess )
    METHOD finished( nExitCode, nExitStatus, oProcess, cWrkEnviron )
@@ -1724,7 +1726,7 @@ METHOD IdeProjManager:finished( nExitCode, nExitStatus, oProcess, cWrkEnviron )
    RETURN Self
 
 METHOD IdeProjManager:GetCurrentExeName( cProject )
-   LOCAL cTargetFN, oProject, cExe
+   LOCAL cTargetFN, oProject
 
    IF empty( cProject )
       cProject := ::getCurrentProjectTitle()
@@ -1756,7 +1758,7 @@ METHOD IdeProjManager:GetCurrentExeName( cProject )
    RETURN cTargetFN
    
 METHOD IdeProjManager:LaunchDebug( cProject )
-   LOCAL cExe
+   LOCAL cExe, a_
    IF empty( cProject )
       cProject := ::getCurrentProjectTitle()
    ENDIF
@@ -1769,6 +1771,9 @@ METHOD IdeProjManager:LaunchDebug( cProject )
    ::oIde:oDebugger = clsDebugger():New(::oIde)
    ::oIde:oDebugger:cCurrentProject := cProject
    ::oIde:oDebugger:aSources := ::getSourcesByProjectTitle( cProject )
+   FOR EACH a_ IN ::oIde:oDebugger:aSources
+      ?a_
+   NEXT
    cExe := ::GetCurrentExeName( cProject )
    IF ! hb_FileExists( cExe )
       ::oOutputResult:oWidget:append( "Launch error: file not found - " + cExe )
