@@ -149,7 +149,7 @@ public:
    int            firstVisibleBlockNumber()        { return QPlainTextEdit::firstVisibleBlock().blockNumber(); };
    int            lastVisibleBlockNumber();
    
-   QVector<int>	  GetBreakPointsVector();
+   QString	  GetBreakPointsVector();
    
 signals:
    void	          BreakPointSet(int line);

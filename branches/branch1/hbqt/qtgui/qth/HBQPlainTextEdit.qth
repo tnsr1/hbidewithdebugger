@@ -70,7 +70,7 @@ HB_FUNC( QT_HBQPLAINTEXTEDIT )
    void           hbSetEventBlock( PHB_ITEM block )
    void           hbSetHighLighter( HBQSyntaxHighlighter * hilighter )
    void           hbHighlightPage()
-   QVector<int>   GetBreakPointsVector()
+   QString        GetBreakPointsVector()
 </PROTOS>
 
 <SLOTS>
