@@ -1589,6 +1589,7 @@ METHOD IdeEditor:create( oIde, cSourceFile, nPos, nHPos, nVPos, cTheme, cView, a
    ::qLayout:addWidget( ::oEdit:qEdit )
 
    ::oEdit:qEdit:connect( "updateRequest(QRect,int)", {|| ::scrollThumbnail() } )
+   ::oEdit:qEdit:connect( "BreakPointSet(int)", {|line| ::BreakPointSet((::cFile + ::cExt), line) } )
 
    ::qDocument  := ::qEdit:document()
    ::qCursor := ::qEdit:textCursor()
@@ -2355,3 +2356,10 @@ STATIC FUNCTION hbide_qtDesigner()
 
 /*----------------------------------------------------------------------*/
 
+METHOD IdeEditor:BreakPointSet(cPrg, nLine)
+   IF !Empty(::oIde:oDebugger)
+      ::oIde:oDebugger:AddBreakPoint(cPrg, nLine)
+   ENDIF
+   RETURN Nil
+   
+/*----------------------------------------------------------------------*/
