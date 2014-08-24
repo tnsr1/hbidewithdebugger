@@ -117,6 +117,7 @@ public:
 
    void           paintEvent( QPaintEvent * event );
    void           lineNumberAreaPaintEvent( QPaintEvent * event );
+   void           lineNumberAreaMouseEvent( QMouseEvent * event );
    void           horzRulerPaintEvent( QPaintEvent * event );
 
    HBQSyntaxHighlighter * highlighter;
@@ -132,6 +133,7 @@ public:
    int            hbGetSpaces()                    { return spaces; };
    void           hbSetSpaces( int newSpaces );
    void           hbBookmarks( int block );
+   void           hbBreakPoints( int block );
    void           hbNextBookmark( int block );
    void           hbPrevBookmark( int block );
    void           hbGotoBookmark( int block );
@@ -146,10 +148,16 @@ public:
 
    int            firstVisibleBlockNumber()        { return QPlainTextEdit::firstVisibleBlock().blockNumber(); };
    int            lastVisibleBlockNumber();
-
+   
+   QVector<int>	  GetBreakPointsVector();
+   
+signals:
+   void	          BreakPointSet(int line);
 private:
    QVector<int>   bookMark;
    QList<int>     bookMarksGoto;
+   QVector<int>   BreakPointsVector;
+   QList<int>     BreakPointsList;
    QWidget      * lineNumberArea;
    QFrame       * horzRuler;
    int            spaces;
@@ -295,7 +303,10 @@ private:
    {
        codeEditor->lineNumberAreaPaintEvent( event );
    }
-
+   void mousePressEvent(QMouseEvent *event) {
+       codeEditor->lineNumberAreaMouseEvent(event);
+   }
+   
    HBQPlainTextEdit *codeEditor;
 };
 
