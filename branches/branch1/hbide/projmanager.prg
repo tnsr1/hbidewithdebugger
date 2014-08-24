@@ -1723,6 +1723,61 @@ METHOD IdeProjManager:finished( nExitCode, nExitStatus, oProcess, cWrkEnviron )
    ENDIF
    RETURN Self
 
+METHOD IdeProjManager:GetCurrentExeName( cProject )
+   LOCAL cTargetFN, oProject, cExe
+
+   IF empty( cProject )
+      cProject := ::getCurrentProjectTitle()
+   ENDIF
+   IF !empty( cProject )
+      oProject  := ::getProjectByTitle( cProject )
+   ELSE
+      RETURN ""
+   ENDIF
+
+   IF !empty( oProject )
+      cTargetFN := hbide_pathFile( oProject:destination, iif( empty( oProject:outputName ), "_temp", oProject:outputName ) )
+#ifdef __PLATFORM__WINDOWS
+      IF oProject:type == "Executable"
+         cTargetFN += '.exe'
+      ENDIF
+#endif
+      IF ! hb_FileExists( cTargetFN )
+         cTargetFN := oProject:launchProgram
+      ENDIF
+   ELSE
+      RETURN ""
+   ENDIF
+   IF empty( cTargetFN )
+      cTargetFN := ""
+   ENDIF
+   cTargetFN := hbide_pathToOSPath( cTargetFN )
+
+   RETURN cTargetFN
+   
+METHOD IdeProjManager:LaunchDebug( cProject )
+   LOCAL cExe
+   IF empty( cProject )
+      cProject := ::getCurrentProjectTitle()
+   ENDIF
+   
+   IF Empty( cProject )
+      ::oOutputResult:oWidget:append( "Not active project" )
+      RETURN .F.
+   ENDIF
+   
+   ::oIde:oDebugger = clsDebugger():New(::oIde)
+   ::oIde:oDebugger:cCurrentProject := cProject
+   ::oIde:oDebugger:aSources := ::getSourcesByProjectTitle( cProject )
+   cExe := ::GetCurrentExeName( cProject )
+   IF ! hb_FileExists( cExe )
+      ::oOutputResult:oWidget:append( "Launch error: file not found - " + cExe )
+      RETURN .F.
+   ENDIF
+   ::oOutputResult:oWidget:append( "Lounchig debug " + cExe )
+   ::oIde:oDebugger:start(cExe)
+
+   RETURN .T. 
 
 METHOD IdeProjManager:launchProject( cProject, cExe, cWrkEnviron )
    LOCAL cTargetFN, cTmp, oProject, cPath, a_, cParam

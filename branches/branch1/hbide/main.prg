@@ -354,6 +354,14 @@ CLASS HbIde
 
    DATA   hHeaderFiles                            INIT {=>}
 
+//debugger interface
+   DATA   oDebugger
+   DATA   oDebugWatch
+   DATA   oDebugVariables
+   DATA   oDebugStack
+   DATA   oDebugWorkAreas
+//---------------------      
+   
    METHOD new( aParams )
    METHOD create( aParams )
    METHOD destroy()
