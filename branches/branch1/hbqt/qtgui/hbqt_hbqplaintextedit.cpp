@@ -2102,8 +2102,7 @@ QString HBQPlainTextEdit::GetBreakPointsVector()
 {
    int i;
    QString RetString = QString("");
-   QString TmpString;// = QString("%1").arg(i);
-   for(i=1;++i;BreakPointsVector.count())
+   for(i=1;i<=BreakPointsVector.count();++i)
    {
       RetString += QString("%1").arg(BreakPointsVector.at(i-1));
       if( i != BreakPointsVector.count() )
