@@ -212,7 +212,7 @@ CLASS IdeEditsManager INHERIT IdeObject
 
    METHOD nextEditor()
    METHOD previousEditor()
-
+   
    ENDCLASS
 
 /*----------------------------------------------------------------------*/
@@ -1486,6 +1486,8 @@ CLASS IdeEditor INHERIT IdeObject
    METHOD vssExecute( cAction )
    METHOD updateComponents()
    METHOD setEncoding( cCodec )
+
+   METHOD BreakPointSet( cPrg, nLine )
 
    ENDCLASS
 
