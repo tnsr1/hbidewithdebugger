@@ -164,6 +164,7 @@ CLASS clsDebugger
     DATA nLineLocate
 
     DATA oTimer
+    
     DATA oSayState
     DATA oEditExpr
     DATA oBtnExp
@@ -185,7 +186,7 @@ CLASS clsDebugger
     DATA aWatches INIT {}
     DATA aExpr INIT {}
     DATA nCurrLine INIT 0
-    DATA nMode
+    DATA nMode INIT MODE_INPUT
     DATA nAnsType
     DATA cPrgBP
     DATA aBPLoad INIT {}
@@ -234,6 +235,7 @@ CLASS clsDebugger
     
     METHOD hu_Get( cTitle, tpict, txget )
     METHOD SetPath( cRes, cName, lClear )
+    METHOD wait4connection()
         
 ENDCLASS
 
@@ -246,6 +248,10 @@ METHOD clsDebugger:init( p_oParent )
    ::nId1 := 0
    ::nId2 := -1
    
+   ::SetMode( MODE_INIT )
+
+   ::cBuffer := Space( BUFF_LEN )
+   
    ::aTabs := ::oIde:aTabs
    ::oOutputResult := ::oIde:oOutputResult
          
@@ -253,6 +259,12 @@ METHOD clsDebugger:init( p_oParent )
    ::oDebugVariables := ::oIde:oDebugVariables
    ::oDebugStack := ::oIde:oDebugStack
    ::oDebugWorkAreas := ::oIde:oDebugWorkAreas
+   
+   ::qTimer := QTimer()
+   ::qTimer:setInterval( 30 )
+   ::qTimer:connect( "timeout()",  {|| ::TimerProc() } )
+   ::qTimer:start()
+   
    RETURN Self
 
 METHOD clsDebugger:start( cExe )
@@ -269,6 +281,8 @@ METHOD clsDebugger:start( cExe )
    ::handl2 := FCreate( cExe + ".d2" )
    FClose( ::handl2 )
 
+   DirChange(cPath)
+
    hb_processOpen( cExe ) //+ Iif( !Empty( cParams ), cParams, "" ) )
 
    ::handl1 := FOpen( cExe + ".d1", FO_READWRITE + FO_SHARED )
@@ -280,14 +294,14 @@ METHOD clsDebugger:start( cExe )
       hbide_showWarning( "No connection" )
       RETURN .F.
    ENDIF
-
-   ::qTimer := QTimer()
-   ::qTimer:setInterval( 30000 )
-   ::qTimer:connect( "timeout()",  {|| ::TimerProc() } )
    
+   ::wait4connection()
+
    ::LoadBreakPoints()
    
-   ::DoCommand( CMD_GO )
+   ::lDebugging := .T.
+   
+//   ::DoCommand( CMD_GO )
    
    RETURN .T.
 
@@ -369,7 +383,7 @@ METHOD clsDebugger:ToggleBreakPoint( cAns, cLine )
          ::aBP[i,1] := 0
       ENDIF
    ENDIF
-   ::SetCurrLine(nLine, ::cPrgName)
+//   ::SetCurrLine(nLine, ::cPrgName)
    RETURN NIL
 
 METHOD clsDebugger:AddBreakPoint( cPrg, nLine )
@@ -402,6 +416,7 @@ METHOD clsDebugger:TimerProc()
    LOCAL n, arr
 STATIC nLastSec := 0
 
+//?"TimerProc():" + Time()
    IF ::nMode != MODE_INPUT
       IF !Empty( arr := ::dbgRead() )
          IF arr[1] == "quit"
@@ -513,7 +528,7 @@ STATIC nLastSec := 0
                         EXIT
                      ENDIF
                   ENDDO
-                  ::oOutputResult:oWidget:append( /*HWindow():GetMain():handle*/"", "Debugger ("+arr[2]+", line "+arr[3]+")" )
+                  ::oOutputResult:oWidget:append( /*HWindow():GetMain():handle*/"Debugger ("+arr[2]+", line "+arr[3]+")" )
                ENDIF
                ::SetMode( MODE_INPUT )
                nLastSec := Seconds()
@@ -535,7 +550,7 @@ METHOD clsDebugger:dbgRead()
       s += Left( ::cBuffer, n )
       IF ( n := At( ",!", s ) ) > 0
          IF ( arr := hb_aTokens( Left( s,n+1 ), "," ) ) != NIL .AND. Len( arr ) > 2 .AND. arr[1] == arr[Len(arr)-1]
-            Return arr
+            RETURN arr
          ELSE
             EXIT
          ENDIF
@@ -578,7 +593,7 @@ LOCAL qCursor
       hbide_showWarning( "Not all parameters passed into clsDebugger:SetCurrLine" )
       RETURN .F.
    ENDIF
-
+?"SetCurrLine", cName, nLine
    IF !::lDebugging
       ::lDebugging := .T.
    ENDIF
@@ -604,7 +619,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
 
    IF ::nMode == MODE_INPUT
       IF nCmd == CMD_GO
-         ::SetWindow( ::cPrgName )
+//         ::SetWindow( ::cPrgName )
          ::Send( "cmd", "go" )
 
       ELSEIF nCmd == CMD_STEP
@@ -823,6 +838,7 @@ METHOD clsDebugger:SetPath( cRes, cName, lClear )
          FOR i := 1 TO Len( arr )
             cFull := arr[i] + ;
                Iif( Empty(arr[i]).OR.Right( arr[i],1 ) $ "\/", "", hb_OsPathSeparator() ) + ::cPrgName
+?"cFull:", cFull
             IF ::SetWindow( cFull )
                EXIT
             ENDIF
@@ -866,3 +882,19 @@ STATIC FUNCTION Hex2Int( stroka )
       res += i - 48
    ENDIF
    RETURN res
+   
+METHOD clsDebugger:wait4connection()
+   LOCAL n
+
+   DO WHILE .T.
+      FSeek( ::handl2, 0, 0 )
+      n := Fread( ::handl2, @::cBuffer, Len(::cBuffer) ) 
+      IF n > 0
+         IF At("ver", ::cBuffer) > 0
+            EXIT
+         ENDIF
+      ENDIF
+//TODO exit by timeout
+   ENDDO
+   
+   RETURN NIL

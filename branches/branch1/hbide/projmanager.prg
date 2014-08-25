@@ -1767,7 +1767,7 @@ METHOD IdeProjManager:LaunchDebug( cProject )
       ::oOutputResult:oWidget:append( "Not active project" )
       RETURN .F.
    ENDIF
-   
+   ::oDockB2:show()
    ::oIde:oDebugger = clsDebugger():New(::oIde)
    ::oIde:oDebugger:cCurrentProject := cProject
    ::oIde:oDebugger:aSources := ::getSourcesByProjectTitle( cProject )
