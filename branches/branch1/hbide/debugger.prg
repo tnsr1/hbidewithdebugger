@@ -137,6 +137,7 @@ REQUEST HB_GT_CGI_DEFAULT
 #xtranslate HB_PROCESSOPEN([<n,...>]) =>  HB_OPENPROCESS(<n>)
 #endif
 */
+#DEFINE cMsgNotSupp "Command isn't supported"
 
 CLASS clsDebugger
 
@@ -144,6 +145,7 @@ CLASS clsDebugger
     
     DATA cCurrentProject
     DATA aSources
+    DATA oOutputResult
 
     DATA lModeIde INIT .T.
     DATA lDebugging INIT .F.
@@ -193,7 +195,6 @@ CLASS clsDebugger
 
     DATA nExitMode INIT 1
     DATA nVerProto INIT 0
-    DATA cMsgNotSupp INIT "Command isn't supported"
 
     DATA cIniPath
     DATA cCurrPath
@@ -219,7 +220,21 @@ CLASS clsDebugger
     METHOD SetMode( newMode )
     METHOD SetCurrLine( nLine, cName )
     METHOD getBP( nLine, cPrg )
+    METHOD DoCommand( nCmd, cDop, cDop2 )
+    METHOD SetWindow( cPrgName )
+    METHOD StopDebug()
     
+    METHOD InspectObject( cObjName )
+    
+    METHOD ShowStack( arr, n )
+    METHOD ShowVars( arr, n, nVarType )
+    METHOD ShowAreas( arr, n )
+    METHOD ShowRec( arr, n )
+    METHOD ShowObject( arr, n )
+    
+    METHOD hu_Get( cTitle, tpict, txget )
+    METHOD SetPath( cRes, cName, lClear )
+        
 ENDCLASS
 
 METHOD clsDebugger:init( p_oParent )
@@ -232,6 +247,7 @@ METHOD clsDebugger:init( p_oParent )
    ::nId2 := -1
    
    ::aTabs := ::oIde:aTabs
+   ::oOutputResult := ::oIde:oOutputResult
          
    ::oDebugWatch := ::oIde:oDebugWatch
    ::oDebugVariables := ::oIde:oDebugVariables
@@ -240,7 +256,7 @@ METHOD clsDebugger:init( p_oParent )
    RETURN Self
 
 METHOD clsDebugger:start( cExe )
-LOCAL cPath, cFile, cExt
+   LOCAL cPath, cFile, cExt
 
    hb_fNameSplit( cExe, @cPath, @cFile, @cExt )
 
@@ -270,6 +286,8 @@ LOCAL cPath, cFile, cExt
    ::qTimer:connect( "timeout()",  {|| ::TimerProc() } )
    
    ::LoadBreakPoints()
+   
+   ::DoCommand( CMD_GO )
    
    RETURN .T.
 
@@ -314,7 +332,7 @@ METHOD clsDebugger:ClearBreakPoints( cPrg )
       IF (Empty(cPrg) .OR. cPrg = ::aBP[n,2]) .AND. ::aBP[n,1] <> 0
          ::AddBreakPoint( ::aBP[n,2], ::aBP[n,1] )
          DO WHILE .T.
-
+            EXIT
             //???
          ENDDO
       ENDIF
@@ -332,7 +350,7 @@ METHOD clsDebugger:DeleteBreakPoint( cPrg, nLine )
    RETURN .T.
 
 METHOD clsDebugger:ToggleBreakPoint( cAns, cLine )
-Local nLine := Val( cLine ), i
+   LOCAL nLine := Val( cLine ), i
 
    IF cAns == "line"
       FOR i := 1 TO Len(::aBP)
@@ -352,18 +370,18 @@ Local nLine := Val( cLine ), i
       ENDIF
    ENDIF
    ::SetCurrLine(nLine, ::cPrgName)
-Return Nil
+   RETURN NIL
 
 METHOD clsDebugger:AddBreakPoint( cPrg, nLine )
 
    IF ::nMode != MODE_INPUT .AND. Empty( ::aBPLoad )
-      Return Nil
+      RETURN NIL
    ENDIF
-//   IF ::nLine == Nil
+//   IF ::nLine == NIL
 //      ::nLine := GetCurrLine()
 //   ENDIF
 
-//      IF cPrg == Nil
+//      IF cPrg == NIL
 //         cPrg := oText:cargo
 //      ENDIF
 
@@ -378,27 +396,152 @@ METHOD clsDebugger:AddBreakPoint( cPrg, nLine )
          ::SetMode( MODE_WAIT_ANS )
       ENDIF
 //   ENDIF
-Return Nil
+   RETURN NIL
    
 METHOD clsDebugger:TimerProc()
+   LOCAL n, arr
+STATIC nLastSec := 0
 
-Return Nil
+   IF ::nMode != MODE_INPUT
+      IF !Empty( arr := ::dbgRead() )
+         IF arr[1] == "quit"
+            ::SetMode( MODE_INIT )
+            ::StopDebug()
+            RETURN NIL
+         ENDIF
+         IF ::nMode == MODE_WAIT_ANS
+            IF Left(arr[1],1) == "b" .AND. ( n := Val( Substr(arr[1],2) ) ) == ::nId1
+               IF ::nAnsType == ANS_CALC
+                  IF arr[2] == "value"
+                     IF !Empty( ::cInspectVar )
+                        IF ( Substr( Hex2Str(arr[3]),2,1 ) ) == "O"
+                           ::nMode := MODE_INPUT
+                           ::InspectObject( ::cInspectVar )
+                           ::cInspectVar := NIL
+                           RETURN NIL
+                        ELSE
+                           hbide_showWarning( ::cInspectVar + " isn't an object" )
+                        ENDIF
+                     ELSE
+//???                        ::SetResult( Hex2Str( arr[3] ) )
+                     ENDIF
+                  ELSE
+                     ::oOutputResult:oWidget:append( ( "-- BAD ANSWER --" ) )
+                  ENDIF                 
+               ELSEIF ::nAnsType == ANS_BRP
+                  IF arr[2] == "err"
+                     ::oOutputResult:oWidget:append( "-- BAD LINE --" )
+                  ELSE
+                     ::ToggleBreakPoint( arr[2], arr[3] )
+                  ENDIF
+                  IF !Empty( ::aBPLoad )
+                     IF ++::nBPLoad <= Len(::aBPLoad)
+                        ::AddBreakPoint( ::aBPLoad[::nBPLoad,2], ::aBPLoad[::nBPLoad,1] )
+                        RETURN NIL
+                     ELSE
+                        ::aBPLoad := NIL
+                     ENDIF
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_STACK
+                  IF arr[2] == "stack"
+                     ::ShowStack( arr, 3 )
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_LOCAL
+                  IF arr[2] == "valuelocal"
+                     ::ShowVars( arr, 3, 1 )
+                  ELSEIF arr[2] == "valuepriv"
+                     ::ShowVars( arr, 3, 2 )
+                  ELSEIF arr[2] == "valuepubl"
+                     ::ShowVars( arr, 3, 3 )
+                  ELSEIF arr[2] == "valuestatic"
+                     ::ShowVars( arr, 3, 4 )
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_WATCH
+                  IF arr[2] == "valuewatch"
+                     ::ShowWatch( arr, 3 )
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_AREAS
+                  IF arr[2] == "valueareas"
+                     ::ShowAreas( arr, 3 )
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_REC
+                  IF arr[2] == "valuerec"
+                     ::ShowRec( arr, 3 )
+                  ENDIF
+               ELSEIF ::nAnsType == ANS_OBJECT
+                  IF arr[2] == "valueobj"
+                     ::ShowObject( arr, 3 )
+                  ENDIF
+               ENDIF
+               ::SetMode( MODE_INPUT )
+            ENDIF
+         ELSE
+            IF Left(arr[1],1) == "a" .AND. ( n := Val( Substr(arr[1],2) ) ) > ::nId2
+               ::nId2 := n
+               IF arr[2] == "."
+                  ::oOutputResult:oWidget:append( "-- BAD LINE --" )
+               ELSE
+                  IF !( ::cPrgName == arr[2] )
+                     ::cPrgName := arr[2]
+                     ::SetPath( ::cPaths, ::cPrgName )
+                  ENDIF
+                  ::SetCurrLine( ::nCurrLine := Val( arr[3] ), ::cPrgName )
+                  n := 4
+                  DO WHILE .T.
+                     IF arr[n] == "ver"
+                        ::nVerProto := Val( arr[n+1] )
+                        n += 2
+                     ELSEIF arr[n] == "stack"
+                        ::ShowStack( arr, n+1 )
+                        n += 2 + Val( arr[n+1] ) * 3
+                     ELSEIF arr[n] == "valuelocal"
+                        ::ShowVars( arr, n+1, 1 )
+                        n += 2 + Val( arr[n+1] ) * 3
+                     ELSEIF arr[n] == "valuepriv"
+                        ::ShowVars( arr, n+1, 2 )
+                        n += 2 + Val( arr[n+1] ) * 3
+                     ELSEIF arr[n] == "valuepubl"
+                        ::ShowVars( arr, n+1, 3 )
+                        n += 2 + Val( arr[n+1] ) * 3
+                     ELSEIF arr[n] == "valuestatic"
+                        ::ShowVars( arr, n+1, 4 )
+                        n += 2 + Val( arr[n+1] ) * 3
+                     ELSEIF arr[n] == "valuewatch"
+                        ::ShowWatch( arr, n+1 )
+                        n += 2 + Val( arr[n+1] )
+                     ELSE
+                        EXIT
+                     ENDIF
+                  ENDDO
+                  ::oOutputResult:oWidget:append( /*HWindow():GetMain():handle*/"", "Debugger ("+arr[2]+", line "+arr[3]+")" )
+               ENDIF
+               ::SetMode( MODE_INPUT )
+               nLastSec := Seconds()
+            ENDIF
+         ENDIF
+      ENDIF
+   ELSEIF ::lAnimate .AND. Seconds() - nLastSec > ::nAnimate
+      ::Send( "cmd", "step" )
+      ::SetMode( MODE_WAIT_BR )
+   ENDIF
+
+   RETURN NIL
 
 METHOD clsDebugger:dbgRead()
-Local n, s := "", arr
+   LOCAL n, s := "", arr
 
    FSeek( ::handl2, 0, 0 )
    DO WHILE ( n := Fread( ::handl2, @::cBuffer, Len(::cBuffer) ) ) > 0
       s += Left( ::cBuffer, n )
       IF ( n := At( ",!", s ) ) > 0
-         IF ( arr := hb_aTokens( Left( s,n+1 ), "," ) ) != Nil .AND. Len( arr ) > 2 .AND. arr[1] == arr[Len(arr)-1]
+         IF ( arr := hb_aTokens( Left( s,n+1 ), "," ) ) != NIL .AND. Len( arr ) > 2 .AND. arr[1] == arr[Len(arr)-1]
             Return arr
          ELSE
             EXIT
          ENDIF
       ENDIF
    ENDDO
-Return Nil
+   RETURN NIL
 
 METHOD clsDebugger:Send( ... )
 Local arr := hb_aParams(), i, s := ""
@@ -409,7 +552,7 @@ Local arr := hb_aParams(), i, s := ""
    NEXT
    FWrite( ::handl1, Ltrim(Str(++::nId1)) + "," + s + Ltrim(Str(::nId1)) + ",!" )
 
-Return Nil
+   RETURN NIL
 
 METHOD clsDebugger:SetMode( newMode )
 
@@ -426,10 +569,10 @@ METHOD clsDebugger:SetMode( newMode )
       ENDIF
    ENDIF
 
-Return Nil
+   RETURN NIL
 
 METHOD clsDebugger:SetCurrLine( nLine, cName )
-LOCAL qCursor, cSource
+LOCAL qCursor
 
    IF PCount() < 2
       hbide_showWarning( "Not all parameters passed into clsDebugger:SetCurrLine" )
@@ -441,11 +584,9 @@ LOCAL qCursor, cSource
    ENDIF
 
 //   oText := GetTextObj( cName, @nTab )
-   cSource := cName
-
-   ::oIde:oSM:editSource( cSource, 0, 0, 0, NIL, NIL, .f., .t. )
+   ::SetWindow( cName )
    qCursor := ::oIde:qCurEdit:textCursor()
-   qCursor:setPosition( 0 )
+
    qCursor:movePosition( QTextCursor_Down, QTextCursor_MoveAnchor, nLine )
    ::oIde:qCurEdit:setTextCursor( qCursor )
    ::oIde:manageFocusInEditor()
@@ -453,8 +594,275 @@ LOCAL qCursor, cSource
 //      IF !Empty( nLine ) .AND. oText:nTextLen >= nLine
 //         oText:GoTo( nLine )
 
-Return Nil
+   RETURN NIL
 
 METHOD clsDebugger:getBP( nLine, cPrg )
-   cPrg := Lower( Iif( cPrg==Nil, ::cPrgName, cPrg ) )
-Return Ascan( ::aBP, {|a|a[1]==nLine .and. Lower(a[2])==cPrg} )
+   cPrg := Lower( Iif( cPrg==NIL, ::cPrgName, cPrg ) )
+   RETURN Ascan( ::aBP, {|a|a[1]==nLine .and. Lower(a[2])==cPrg} )
+
+METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
+
+   IF ::nMode == MODE_INPUT
+      IF nCmd == CMD_GO
+         ::SetWindow( ::cPrgName )
+         ::Send( "cmd", "go" )
+
+      ELSEIF nCmd == CMD_STEP
+         ::Send( "cmd", "step" )
+
+      ELSEIF nCmd == CMD_TOCURS
+         ::Send( "cmd", "to", ::cPrgName, Ltrim(Str(::GetCurrLine())) )
+
+      ELSEIF nCmd == CMD_TRACE
+         ::Send( "cmd", "trace" )
+
+      ELSEIF nCmd == CMD_NEXTR
+         ::Send( "cmd", "nextr" )
+
+      ELSEIF nCmd == CMD_EXP
+         ::Send( "exp", cDop )
+         ::nAnsType := ANS_CALC
+         ::SetMode( MODE_WAIT_ANS )
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_STACK
+         ::Send( "view", "stack", cDop )
+         ::nAnsType := ANS_STACK
+         ::SetMode( MODE_WAIT_ANS )
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_LOCAL
+         ::Send( "view", "local", cDop )
+         ::nAnsType := ANS_LOCAL
+         ::SetMode( MODE_WAIT_ANS )
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_PRIV
+         IF ::nVerProto > 1
+            ::Send( "view", "priv", cDop )
+            ::nAnsType := ANS_LOCAL
+            ::SetMode( MODE_WAIT_ANS )
+         ELSE
+            hbide_showWarning( cMsgNotSupp )
+         ENDIF
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_PUBL
+         IF ::nVerProto > 1
+            ::Send( "view", "publ", cDop )
+            ::nAnsType := ANS_LOCAL
+            ::SetMode( MODE_WAIT_ANS )
+         ELSE
+            hbide_showWarning( cMsgNotSupp )
+         ENDIF
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_STATIC
+         IF ::nVerProto > 1
+            ::Send( "view", "static", cDop )
+            ::nAnsType := ANS_LOCAL
+            ::SetMode( MODE_WAIT_ANS )
+         ELSE
+            hbide_showWarning( cMsgNotSupp )
+         ENDIF
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_WATCH
+         IF Empty( cDop2 )
+            ::Send( "view", "watch", cDop )
+         ELSE
+            ::Send( "watch", cDop, cDop2 )
+         ENDIF
+         ::nAnsType := ANS_WATCH
+         ::SetMode( MODE_WAIT_ANS )
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_AREA
+         ::Send( "view", "areas" )
+         ::nAnsType := ANS_AREAS
+         ::SetMode( MODE_WAIT_ANS )
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_REC
+         IF ::nVerProto > 1
+            ::Send( "insp", "rec", cDop )
+            ::nAnsType := ANS_REC
+            ::SetMode( MODE_WAIT_ANS )
+         ELSE
+            hbide_showWarning( cMsgNotSupp )
+         ENDIF
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_OBJECT
+         IF ::nVerProto > 1
+            ::Send( "insp", "obj", cDop )
+            ::nAnsType := ANS_OBJECT
+            ::SetMode( MODE_WAIT_ANS )
+         ELSE
+            hbide_showWarning( cMsgNotSupp )
+         ENDIF
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_QUIT
+         ::nExitMode := 2
+//         ::EndWindow()
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_EXIT
+         ::nExitMode := 1
+//         ::EndWindow()
+         RETURN NIL
+
+      ELSEIF nCmd == CMD_TERMINATE
+         ::Send( "cmd", "quit" )
+         ::lDebugging := .F.
+         ::StopDebug()
+
+      ENDIF
+      ::SetMode( MODE_WAIT_BR )
+   ELSEIF nCmd == CMD_EXIT
+      ::nExitMode := 1
+//      ::EndWindow()
+
+   ENDIF
+   RETURN NIL
+
+METHOD clsDebugger:SetWindow( cPrgName )
+   LOCAL qCursor
+   ::oIde:oSM:editSource( cPrgName, 0, 0, 0, NIL, NIL, .f., .t. )
+   qCursor := ::oIde:qCurEdit:textCursor()
+   qCursor:setPosition( 0 )
+
+   RETURN .T.
+
+METHOD clsDebugger:StopDebug()
+
+   ::oDebugWatch:Close()
+   ::oDebugVariables:Close()
+   ::oDebugStack:Close()
+   ::oDebugWorkAreas:Close()
+
+   IF ::handl1 != -1
+      FClose( ::handl1 )
+      FClose( ::handl2 )
+      ::handl1 := -1
+   ENDIF
+   RETURN NIL
+
+METHOD clsDebugger:InspectObject( cObjName )
+//   LOCAL oDlg, oBrw
+
+/*
+   INIT DIALOG oDlg TITLE "Object inspector ("+cObjName+")" AT 30, 30 SIZE 480, 400 ;
+     FONT HWindow():GetMain():oFont
+
+   @ 0,0 BROWSE oBrw ARRAY OF oDlg          ;
+         SIZE 480,340                       ;
+         FONT HWindow():GetMain():oFont     ;
+         STYLE WS_VSCROLL                   ;
+         ON SIZE ANCHOR_TOPABS + ANCHOR_LEFTABS + ANCHOR_RIGHTABS + ANCHOR_BOTTOMABS
+
+   oBrw:aArray := {}
+   oBrw:AddColumn( HColumn():New( "Name",{|v,o|o:aArray[o:nCurrent,1]},"C",12,0 ) )
+   oBrw:AddColumn( HColumn():New( "Type",{|v,o|o:aArray[o:nCurrent,2]},"C",2,0 ) )
+   oBrw:AddColumn( HColumn():New( "Value",{|v,o|o:aArray[o:nCurrent,3]},"C",60,0 ) )
+
+   oBrw:bcolorSel := oBrw:htbcolor := CLR_LGREEN
+   oBrw:tcolorSel := oBrw:httcolor := 0
+
+   @ 45, 360 BUTTON "Refresh" ON CLICK {|| oInspectDlg:=oDlg,DoCommand(CMD_OBJECT,cObjName) } SIZE 100, 28 ON SIZE ANCHOR_BOTTOMABS
+   @ 335, 360 BUTTON "Close" ON CLICK {|| oDlg:Close() } SIZE 100, 28 ON SIZE ANCHOR_RIGHTABS + ANCHOR_BOTTOMABS
+
+   ACTIVATE DIALOG oDlg NOMODAL
+
+   oInspectDlg := oDlg
+*/
+   ::DoCommand( CMD_OBJECT, cObjName )
+
+   RETURN NIL
+   
+METHOD clsDebugger:ShowStack( arr, n )
+   HB_SYMBOL_UNUSED( arr )
+   HB_SYMBOL_UNUSED( n )
+   RETURN NIL
+   
+METHOD clsDebugger:ShowVars( arr, n, nVarType )
+   HB_SYMBOL_UNUSED( arr )
+   HB_SYMBOL_UNUSED( n )
+   HB_SYMBOL_UNUSED( nVarType )
+
+   RETURN NIL
+
+METHOD clsDebugger:ShowAreas( arr, n )
+   HB_SYMBOL_UNUSED( arr )
+   HB_SYMBOL_UNUSED( n )
+
+   RETURN NIL
+   
+METHOD clsDebugger:ShowRec( arr, n )
+   HB_SYMBOL_UNUSED( arr )
+   HB_SYMBOL_UNUSED( n )
+
+   RETURN NIL
+
+METHOD clsDebugger:ShowObject( arr, n )
+   HB_SYMBOL_UNUSED( arr )
+   HB_SYMBOL_UNUSED( n )
+
+   RETURN NIL
+   
+METHOD clsDebugger:SetPath( cRes, cName, lClear )
+   LOCAL arr, i, cFull
+   
+   HB_SYMBOL_UNUSED( lClear )
+
+   IF !Empty( cRes ) .OR. !Empty( cRes := ::hu_Get( "Path to source files", "@S256", ::cPaths ) )
+      ::cPaths := Iif( Left( cRes,1 ) != ";", ";" + cRes, cRes )
+      arr := hb_aTokens( ::cPaths, ";" )
+      IF !Empty( cName )
+         FOR i := 1 TO Len( arr )
+            cFull := arr[i] + ;
+               Iif( Empty(arr[i]).OR.Right( arr[i],1 ) $ "\/", "", hb_OsPathSeparator() ) + ::cPrgName
+            IF ::SetWindow( cFull )
+               EXIT
+            ENDIF
+         NEXT
+      ENDIF
+   ENDIF
+
+   RETURN NIL
+
+METHOD clsDebugger:hu_Get( cTitle, tpict, txget )
+   HB_SYMBOL_UNUSED( cTitle )
+   HB_SYMBOL_UNUSED( tpict )
+   HB_SYMBOL_UNUSED( txget )
+
+   RETURN ""
+   
+STATIC FUNCTION Hex2Str( stroka )
+   LOCAL cRes := "", i := 1, nLen := Len( stroka )
+
+   DO WHILE i <= nLen
+      cRes += Chr( Hex2Int( Substr( stroka,i,2 ) ) )
+      i += 2
+   ENDDO
+   RETURN cRes
+
+STATIC FUNCTION Hex2Int( stroka )
+   LOCAL i := ASC( stroka ), res
+
+   IF i > 64 .AND. i < 71
+      res := ( i - 55 ) * 16
+   ELSEIF i > 47 .AND. i < 58
+      res := ( i - 48 ) * 16
+   ELSE
+      RETURN 0
+   ENDIF
+
+   i := ASC( SubStr( stroka,2,1 ) )
+   IF i > 64 .AND. i < 71
+      res += i - 55
+   ELSEIF i > 47 .AND. i < 58
+      res += i - 48
+   ENDIF
+   RETURN res
