@@ -146,6 +146,9 @@ CLASS clsDebugger
     DATA cCurrentProject
     DATA aSources
     DATA oOutputResult
+    
+    DATA cBP_prg
+    DATA nBP_line
 
     DATA lModeIde INIT .T.
     DATA lDebugging INIT .F.
@@ -295,7 +298,12 @@ METHOD clsDebugger:start( cExe )
       RETURN .F.
    ENDIF
    
-   ::wait4connection()
+   IF ::wait4connection()
+      ::oOutputResult:oWidget:append( "Connected Ok!" )
+   ELSE
+      ::oOutputResult:oWidget:append( "Not connected! Debug terminated." )
+      RETURN .F.
+   ENDIF
 
    ::LoadBreakPoints()
    
@@ -321,7 +329,7 @@ METHOD clsDebugger:LoadBreakPoints()
                      EXIT
                   ELSE
                      Aadd( ::aBPLoad, { Val(SubStr(cBP, 1, pos - 1)), oEditor:oTab:caption } )
-                     cBP = SubStr(cBP, pos + 1, Len(cBP - 1))
+                     cBP = SubStr(cBP, pos + 1, Len(cBP) - pos)
                   ENDIF
                ENDDO
             ENDIF
@@ -370,6 +378,7 @@ METHOD clsDebugger:ToggleBreakPoint( cAns, cLine )
       FOR i := 1 TO Len(::aBP)
          IF ::aBP[i,1] == 0
             ::aBP[i,1] := nLine
+            ::aBP[i,2] := ::cPrgBP
             EXIT
          ENDIF
       NEXT
@@ -400,8 +409,10 @@ METHOD clsDebugger:AddBreakPoint( cPrg, nLine )
 //      ENDIF
 
       IF ::getBP( nLine, cPrg ) == 0
+         ::oOutputResult:oWidget:append( ( "Setting break point: " + cPrg + ": " + Str(nLine) ) )
          ::Send( "brp", "add", cPrg, Ltrim(Str(nLine)) )
       ELSE
+         ::oOutputResult:oWidget:append( ( "Deleting break point: " + cPrg + ": " + Str(nLine) ) )
          ::Send( "brp", "del", cPrg, Ltrim(Str(nLine)) )
       ENDIF
       IF ::nMode != MODE_WAIT_ANS
@@ -447,14 +458,16 @@ STATIC nLastSec := 0
                   IF arr[2] == "err"
                      ::oOutputResult:oWidget:append( "-- BAD LINE --" )
                   ELSE
-                     ::ToggleBreakPoint( arr[2], arr[3] )
+                     ::oOutputResult:oWidget:append( "Ok" )
                   ENDIF
+                  ::ToggleBreakPoint( "line", arr[3] )
+
                   IF !Empty( ::aBPLoad )
                      IF ++::nBPLoad <= Len(::aBPLoad)
                         ::AddBreakPoint( ::aBPLoad[::nBPLoad,2], ::aBPLoad[::nBPLoad,1] )
                         RETURN NIL
                      ELSE
-                        ::aBPLoad := NIL
+                        ::aBPLoad := {}
                      ENDIF
                   ENDIF
                ELSEIF ::nAnsType == ANS_STACK
@@ -884,7 +897,7 @@ STATIC FUNCTION Hex2Int( stroka )
    RETURN res
    
 METHOD clsDebugger:wait4connection()
-   LOCAL n
+   LOCAL n, nSec := Seconds()
 
    DO WHILE .T.
       FSeek( ::handl2, 0, 0 )
@@ -894,7 +907,10 @@ METHOD clsDebugger:wait4connection()
             EXIT
          ENDIF
       ENDIF
-//TODO exit by timeout
+      
+      IF Seconds() - nSec > 5
+         RETURN .F.
+      ENDIF
    ENDDO
    
-   RETURN NIL
+   RETURN .T.

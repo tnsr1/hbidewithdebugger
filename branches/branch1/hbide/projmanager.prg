@@ -1776,7 +1776,7 @@ METHOD IdeProjManager:LaunchDebug( cProject )
       ::oOutputResult:oWidget:append( "Launch error: file not found - " + cExe )
       RETURN .F.
    ENDIF
-   ::oOutputResult:oWidget:append( "Lounchig debug " + cExe )
+   ::oOutputResult:oWidget:append( "Lounching debug " + cExe )
    ::oIde:oDebugger:start(cExe)
 
    RETURN .T. 
