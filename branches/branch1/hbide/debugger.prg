@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 1 2014-08-25 19:18:57Z alex; $
+ * $Id: debugger.prg 2 2014-08-25 19:58:45 alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -464,7 +464,7 @@ STATIC nLastSec := 0
                      ::ToggleBreakPoint( "line", Str(::nLineBP) )
                   ELSE
                      ::oOutputResult:oWidget:append( "Ok" )
-                     ::ToggleBreakPoint( "line", arr[3] )
+                     ::ToggleBreakPoint( arr[2], arr[3] )
                   ENDIF
 
                   IF !Empty( ::aBPLoad )

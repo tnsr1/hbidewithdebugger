@@ -101,13 +101,13 @@ parseexpr.c
 
 #--debugger
 debugger.prg
-debug_watch_ui.prg
-debug_vars_ui.prg
-debug_stack_ui.prg
+#debug_watch_ui.prg
+#debug_vars_ui.prg
+#debug_stack_ui.prg
 
-debug_watch.ui
-debug_vars.ui
-debug_stack.ui
+#debug_watch.ui
+#debug_vars.ui
+#debug_stack.ui
 #--debugger
 
 
