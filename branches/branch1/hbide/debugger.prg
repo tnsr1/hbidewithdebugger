@@ -1,5 +1,5 @@
 /*
- * $Id: hwgdebug.prg 2159 2013-07-19 08:36:53Z alkresin $
+ * $Id: debugger.prg 1 2014-08-25 19:18:57Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -340,6 +340,10 @@ METHOD clsDebugger:LoadBreakPoints()
       ::AddBreakPoint( ::aBPLoad[1,2], ::aBPLoad[1,1] )
    ENDIF
 
+   WHILE !Empty(::aBPLoad)
+      ::TimerProc()//wait for load
+   ENDDO
+
    RETURN .T.
 
 METHOD clsDebugger:ClearBreakPoints( cPrg )
@@ -600,31 +604,6 @@ METHOD clsDebugger:SetMode( newMode )
 
    RETURN NIL
 
-METHOD clsDebugger:SetCurrLine( nLine, cName )
-LOCAL qCursor
-
-   IF PCount() < 2
-      hbide_showWarning( "Not all parameters passed into clsDebugger:SetCurrLine" )
-      RETURN .F.
-   ENDIF
-?"SetCurrLine", cName, nLine
-   IF !::lDebugging
-      ::lDebugging := .T.
-   ENDIF
-
-//   oText := GetTextObj( cName, @nTab )
-   ::SetWindow( cName )
-   qCursor := ::oIde:qCurEdit:textCursor()
-
-   qCursor:movePosition( QTextCursor_Down, QTextCursor_MoveAnchor, nLine )
-   ::oIde:qCurEdit:setTextCursor( qCursor )
-   ::oIde:manageFocusInEditor()
-
-//      IF !Empty( nLine ) .AND. oText:nTextLen >= nLine
-//         oText:GoTo( nLine )
-
-   RETURN NIL
-
 METHOD clsDebugger:getBP( nLine, cPrg )
    cPrg := Lower( Iif( cPrg==NIL, ::cPrgName, cPrg ) )
    RETURN Ascan( ::aBP, {|a|a[1]==nLine .and. Lower(a[2])==cPrg} )
@@ -756,11 +735,46 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
    ENDIF
    RETURN NIL
 
+METHOD clsDebugger:SetCurrLine( nLine, cName )
+LOCAL qCursor
+
+   IF PCount() < 2
+      hbide_showWarning( "Not all parameters passed into clsDebugger:SetCurrLine" )
+      RETURN .F.
+   ENDIF
+
+   IF !::lDebugging
+      ::lDebugging := .T.
+   ENDIF
+
+//   oText := GetTextObj( cName, @nTab )
+   ::SetWindow( cName )
+   qCursor := ::oIde:qCurEdit:textCursor()
+
+   qCursor:movePosition( QTextCursor_Down, QTextCursor_MoveAnchor, nLine - 1)
+   ::oIde:qCurEdit:setTextCursor( qCursor )
+   ::oIde:manageFocusInEditor()
+
+//      IF !Empty( nLine ) .AND. oText:nTextLen >= nLine
+//         oText:GoTo( nLine )
+
+   RETURN NIL
+
 METHOD clsDebugger:SetWindow( cPrgName )
    LOCAL qCursor
+   LOCAL i, oEditor
+
+   FOR i := 1 TO Len(::aTabs)
+      oEditor := ::aTabs[ i, TAB_OEDITOR ]
+      IF (oEditor:cFile + oEditor:cExt) == cPrgName
+         cPrgName := oEditor:cPath + oEditor:cFile + oEditor:cExt
+         EXIT
+      ENDIF
+   NEXT i
    ::oIde:oSM:editSource( cPrgName, 0, 0, 0, NIL, NIL, .f., .t. )
    qCursor := ::oIde:qCurEdit:textCursor()
    qCursor:setPosition( 0 )
+   ::oIde:qCurEdit:setTextCursor( qCursor )
 
    RETURN .T.
 
@@ -852,7 +866,6 @@ METHOD clsDebugger:SetPath( cRes, cName, lClear )
          FOR i := 1 TO Len( arr )
             cFull := arr[i] + ;
                Iif( Empty(arr[i]).OR.Right( arr[i],1 ) $ "\/", "", hb_OsPathSeparator() ) + ::cPrgName
-?"cFull:", cFull
             IF ::SetWindow( cFull )
                EXIT
             ENDIF
