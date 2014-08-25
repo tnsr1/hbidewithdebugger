@@ -147,9 +147,6 @@ CLASS clsDebugger
     DATA aSources
     DATA oOutputResult
     
-    DATA cBP_prg
-    DATA nBP_line
-
     DATA lModeIde INIT .T.
     DATA lDebugging INIT .F.
     DATA hHrbProj
@@ -192,6 +189,7 @@ CLASS clsDebugger
     DATA nMode INIT MODE_INPUT
     DATA nAnsType
     DATA cPrgBP
+    DATA nLineBP
     DATA aBPLoad INIT {}
     DATA nBPLoad
     DATA lAnimate INIT .F.
@@ -309,7 +307,7 @@ METHOD clsDebugger:start( cExe )
    
    ::lDebugging := .T.
    
-//   ::DoCommand( CMD_GO )
+   ::DoCommand( CMD_GO )
    
    RETURN .T.
 
@@ -366,6 +364,7 @@ METHOD clsDebugger:DeleteBreakPoint( cPrg, nLine )
       IF ::nMode != MODE_WAIT_ANS
          ::nAnsType := ANS_BRP
          ::cPrgBP := cPrg
+         ::nLineBP := nLine
          ::SetMode( MODE_WAIT_ANS )
 //         ::TimerProc()
       ENDIF
@@ -418,6 +417,7 @@ METHOD clsDebugger:AddBreakPoint( cPrg, nLine )
       IF ::nMode != MODE_WAIT_ANS
          ::nAnsType := ANS_BRP
          ::cPrgBP := cPrg
+         ::nLineBP := nLine
          ::SetMode( MODE_WAIT_ANS )
       ENDIF
 //   ENDIF
@@ -457,10 +457,11 @@ STATIC nLastSec := 0
                ELSEIF ::nAnsType == ANS_BRP
                   IF arr[2] == "err"
                      ::oOutputResult:oWidget:append( "-- BAD LINE --" )
+                     ::ToggleBreakPoint( "line", Str(::nLineBP) )
                   ELSE
                      ::oOutputResult:oWidget:append( "Ok" )
+                     ::ToggleBreakPoint( "line", arr[3] )
                   ENDIF
-                  ::ToggleBreakPoint( "line", arr[3] )
 
                   IF !Empty( ::aBPLoad )
                      IF ++::nBPLoad <= Len(::aBPLoad)
