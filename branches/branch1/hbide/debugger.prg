@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 2 2014-08-25 19:58:45 alex; $
+ * $Id: debugger.prg 3 2014-08-26 01:37:22Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -314,6 +314,7 @@ METHOD clsDebugger:start( cExe )
 METHOD clsDebugger:LoadBreakPoints()
    LOCAL i, j, oEditor, cBP, pos
 
+   ::oOutputResult:oWidget:append( "Loading breakpoints..." )
    FOR j := 1 TO Len(::aSources)
       FOR i := 1 TO Len(::aTabs)
          oEditor := ::aTabs[ i, TAB_OEDITOR ]
@@ -473,6 +474,7 @@ STATIC nLastSec := 0
                         RETURN NIL
                      ELSE
                         ::aBPLoad := {}
+                        ::oOutputResult:oWidget:append( "Breakpoints loaded." )
                      ENDIF
                   ENDIF
                ELSEIF ::nAnsType == ANS_STACK
