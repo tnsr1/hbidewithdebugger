@@ -142,8 +142,7 @@ REQUEST HB_GT_CGI_DEFAULT
 CLASS clsDebugger
 
     DATA oIde
-    
-    DATA nWatchRow
+    DATA nRowWatch
     
     DATA cCurrentProject
     DATA aSources
@@ -172,12 +171,6 @@ CLASS clsDebugger
     DATA oBtnExp
     DATA oMainFont
     
-    DATA oBrwRes
-    DATA oStackDlg
-    DATA oVarsDlg
-    DATA oWatchDlg
-    DATA oAreasDlg
-    DATA oInspectDlg
     DATA cInspectVar
     DATA lViewCmd INIT .T.
     DATA oTabMain
@@ -248,7 +241,7 @@ CLASS clsDebugger
     METHOD ui_tableWatch_ins()
     METHOD ui_tableWatch_del()
     
-    METHOD addWatch(item)
+    METHOD changeWatch(item)
     
 ENDCLASS
 
@@ -278,10 +271,12 @@ METHOD clsDebugger:init( p_oParent )
    ::qTimer:connect( "timeout()",  {|| ::TimerProc() } )
    ::qTimer:start()
    
+   DO WHILE !Empty(::aBPLoad)
+      hb_idleSleep(10)
+   ENDDO
+   
    ::oUI = hbqtui_debugger()
    ::ui_init()
-   ::oUI:show()
-   ::oUI:oWidget:ActivateWindow()
    
    RETURN Self
 
@@ -572,6 +567,9 @@ STATIC nLastSec := 0
                ::SetMode( MODE_INPUT )
                nLastSec := Seconds()
                ::ui_load()
+               ::oUI:show()
+               ::oUI:ActivateWindow()//oWidget
+
             ENDIF
          ENDIF
       ENDIF
@@ -885,14 +883,11 @@ METHOD clsDebugger:ShowVars( arr, n, nVarType )
 
 METHOD clsDebugger:ShowWatch( arr, n )
    LOCAL i, nLen := Val( arr[n] )
-
-   IF !Empty(::WatchRow)
-      ::oUI:tableWatchExpressions:setItem(::WatchRow, 1, arr[ ++n ])
+   IF nLen == 1
+      ::oUI:tableWatchExpressions:setItem(::nRowWatch, 1, QTableWidgetItem(Hex2Str( arr[ ++n ] )))
    ELSE
-      ::oUI:tableWatchExpressions:setRowCount(0)
-      ::oUI:tableWatchExpressions:setRowCount(nLen)
       FOR i := 1 TO nLen
-         ::oUI:tableWatchExpressions:setItem(i - 1, 1, Hex2Str( arr[ ++n ] ))
+         ::oUI:tableWatchExpressions:setItem(i - 1, 1, QTableWidgetItem(Hex2Str( arr[ ++n ] )))
       NEXT
    ENDIF
 
@@ -1036,7 +1031,7 @@ METHOD clsDebugger:ui_init()
    ::oUI:btnAddExpression:connect("clicked()", { || ::ui_tableWatch_ins() } )
    ::oUI:btnDeleteExpression:connect("clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:btnDeleteExpression:connect("clicked()", { || ::ui_tableWatch_del() } )
-//   ::oUI:tableWatchExpressions:connect("itemChanged(QTableWidgetItem)", { |item| ::addWatch(item) } )
+   ::oUI:tableWatchExpressions:connect("itemChanged(QTableWidgetItem*)", { |item| ::changeWatch(item) } )
 
    RETURN NIL
    
@@ -1066,19 +1061,51 @@ METHOD clsDebugger:ui_load()
    
 METHOD clsDebugger:ui_tableWatch_ins()
 
-   ::oUI:tableWatchExpressions:insertRow(::oUI:tableWatchExpressions:rowCount())
+   ::oUI:tableWatchExpressions:insertRow(::oUI:tableWatchExpressions:RowCount())
+   AAdd(::aWatches, { ::oUI:tableWatchExpressions:RowCount()-1, "" })
 
    RETURN NIL
    
 METHOD clsDebugger:ui_tableWatch_del()
-
-   ::oUI:tableWatchExpressions:RemoveRow(::oUI:tableWatchExpressions:currentRow())
-
+   LOCAL i, r := ::oUI:tableWatchExpressions:currentRow(), ri := 0
+   FOR i := 1 TO Len(::aWatches)
+      IF ::aWatches[i,1] == r
+         ri := i
+         ::SetMode( MODE_INPUT )
+         ::DoCommand( CMD_WATCH, "del", Ltrim(Str( i )) )
+      ENDIF
+      IF ::aWatches[i,1] > r
+         --::aWatches[i,1]
+      ENDIF
+   NEXT
+   IF ri > 0
+      hb_ADel(::aWatches, ri, .T.)
+   ENDIF
+   ::oUI:tableWatchExpressions:RemoveRow(r)
    RETURN NIL
    
-METHOD clsDebugger:addWatch(item)
+METHOD clsDebugger:changeWatch(item)
+   LOCAL i, rc := ::oUI:tableWatchExpressions:RowCount(), r := 0
    IF item:column() == 0
-      ::WatchRow := ::oUI:tableWatchExpressions:currentRow()
-      ::oCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
+      FOR i := 1 TO Len(::aWatches)
+         IF ::aWatches[i,1] == item:Row()
+            IF Empty(::aWatches[i,2])
+               ::aWatches[i,2] := item:text()
+               ::nRowWatch := item:Row()
+            ELSE
+               ::SetMode( MODE_INPUT )
+               ::DoCommand( CMD_WATCH, "del", Ltrim(Str( i )) )
+               ::wait4connection("ok")
+               r := i
+               ::nRowWatch := rc - 1
+            ENDIF
+        ENDIF
+      NEXT
+      IF r > 0
+         AAdd(::aWatches, { rc - 1, item:text() })
+         hb_ADel(::aWatches, r, .T.)
+      ENDIF
+      ::SetMode( MODE_INPUT )
+      ::DoCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
    ENDIF
    RETURN NIL
