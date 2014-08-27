@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 3 2014-08-26 01:37:22Z alex; $
+ * $Id: debugger.prg 4 2014-08-27 17:37:29Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -143,6 +143,8 @@ CLASS clsDebugger
 
     DATA oIde
     
+    DATA nWatchRow
+    
     DATA cCurrentProject
     DATA aSources
     DATA oOutputResult
@@ -208,6 +210,8 @@ CLASS clsDebugger
     DATA   oDebugVariables
     DATA   oDebugStack
     DATA   oDebugWorkAreas
+    
+    DATA oUI
    
     METHOD init( p_oParent )
     METHOD start( cExe )   
@@ -230,14 +234,22 @@ CLASS clsDebugger
     
     METHOD ShowStack( arr, n )
     METHOD ShowVars( arr, n, nVarType )
+    METHOD ShowWatch( arr, n )
     METHOD ShowAreas( arr, n )
     METHOD ShowRec( arr, n )
     METHOD ShowObject( arr, n )
     
     METHOD hu_Get( cTitle, tpict, txget )
     METHOD SetPath( cRes, cName, lClear )
-    METHOD wait4connection()
-        
+    METHOD wait4connection( cStr )
+    
+    METHOD ui_init()
+    METHOD ui_load()        
+    METHOD ui_tableWatch_ins()
+    METHOD ui_tableWatch_del()
+    
+    METHOD addWatch(item)
+    
 ENDCLASS
 
 METHOD clsDebugger:init( p_oParent )
@@ -265,6 +277,11 @@ METHOD clsDebugger:init( p_oParent )
    ::qTimer:setInterval( 30 )
    ::qTimer:connect( "timeout()",  {|| ::TimerProc() } )
    ::qTimer:start()
+   
+   ::oUI = hbqtui_debugger()
+   ::ui_init()
+   ::oUI:show()
+   ::oUI:oWidget:ActivateWindow()
    
    RETURN Self
 
@@ -296,13 +313,15 @@ METHOD clsDebugger:start( cExe )
       RETURN .F.
    ENDIF
    
-   IF ::wait4connection()
+   IF ::wait4connection("ver")
       ::oOutputResult:oWidget:append( "Connected Ok!" )
    ELSE
       ::oOutputResult:oWidget:append( "Not connected! Debug terminated." )
       RETURN .F.
    ENDIF
 
+   ::TimerProc()
+   
    ::LoadBreakPoints()
    
    ::lDebugging := .T.
@@ -552,6 +571,7 @@ STATIC nLastSec := 0
                ENDIF
                ::SetMode( MODE_INPUT )
                nLastSec := Seconds()
+               ::ui_load()
             ENDIF
          ENDIF
       ENDIF
@@ -585,8 +605,9 @@ Local arr := hb_aParams(), i, s := ""
    FOR i := 1 TO Len( arr )
       s += arr[i] + ","
    NEXT
-   FWrite( ::handl1, Ltrim(Str(++::nId1)) + "," + s + Ltrim(Str(::nId1)) + ",!" )
 
+   FWrite( ::handl1, Ltrim(Str(++::nId1)) + "," + s + Ltrim(Str(::nId1)) + ",!" )
+   
    RETURN NIL
 
 METHOD clsDebugger:SetMode( newMode )
@@ -611,7 +632,6 @@ METHOD clsDebugger:getBP( nLine, cPrg )
    RETURN Ascan( ::aBP, {|a|a[1]==nLine .and. Lower(a[2])==cPrg} )
 
 METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
-
    IF ::nMode == MODE_INPUT
       IF nCmd == CMD_GO
 //         ::SetWindow( ::cPrgName )
@@ -827,14 +847,54 @@ METHOD clsDebugger:InspectObject( cObjName )
    RETURN NIL
    
 METHOD clsDebugger:ShowStack( arr, n )
-   HB_SYMBOL_UNUSED( arr )
-   HB_SYMBOL_UNUSED( n )
-   RETURN NIL
+   LOCAL i, nLen := Val( arr[n] )
+
+      ::oUI:tableStack:setRowCount(nLen)
+      FOR i := 1 TO nLen
+         ::oUI:tableStack:setItem(i-1, 0, QTableWidgetItem(arr[ ++n ]))
+         ::oUI:tableStack:setItem(i-1, 1, QTableWidgetItem(arr[ ++n ]))
+         ::oUI:tableStack:setItem(i-1, 2, QTableWidgetItem(arr[ ++n ]))
+      NEXT
+      
+      RETURN NIL
    
 METHOD clsDebugger:ShowVars( arr, n, nVarType )
-   HB_SYMBOL_UNUSED( arr )
-   HB_SYMBOL_UNUSED( n )
-   HB_SYMBOL_UNUSED( nVarType )
+   LOCAL i, nLen := Val( arr[n] )
+   LOCAL oTable
+//      ::oUI:tabWidget:setCurrentIndex(nVarType)
+
+      DO CASE
+      CASE nVarType = 1
+         oTable := ::oUI:tableVarLocal
+      CASE nVarType = 2
+         oTable := ::oUI:tableVarPrivate
+      CASE nVarType = 3
+         oTable := ::oUI:tableVarPublic
+      CASE nVarType = 4
+         oTable := ::oUI:tableVarStatic
+      ENDCASE
+      
+      oTable:setRowCount(nLen)
+      FOR i := 1 TO nLen
+         oTable:setItem(i-1, 0, QTableWidgetItem(Hex2Str( arr[ ++n ] )))
+         oTable:setItem(i-1, 1, QTableWidgetItem(Hex2Str( arr[ ++n ] )))
+         oTable:setItem(i-1, 2, QTableWidgetItem(Hex2Str( arr[ ++n ] )))
+      NEXT
+
+   RETURN NIL
+
+METHOD clsDebugger:ShowWatch( arr, n )
+   LOCAL i, nLen := Val( arr[n] )
+
+   IF !Empty(::WatchRow)
+      ::oUI:tableWatchExpressions:setItem(::WatchRow, 1, arr[ ++n ])
+   ELSE
+      ::oUI:tableWatchExpressions:setRowCount(0)
+      ::oUI:tableWatchExpressions:setRowCount(nLen)
+      FOR i := 1 TO nLen
+         ::oUI:tableWatchExpressions:setItem(i - 1, 1, Hex2Str( arr[ ++n ] ))
+      NEXT
+   ENDIF
 
    RETURN NIL
 
@@ -883,7 +943,23 @@ METHOD clsDebugger:hu_Get( cTitle, tpict, txget )
    HB_SYMBOL_UNUSED( txget )
 
    RETURN ""
+
+STATIC FUNCTION Int2Hex( n )
+   LOCAL n1 := Int( n/16 ), n2 := n % 16
+
+   IF n > 255
+      RETURN "XX"
+   ENDIF
+   RETURN Chr( Iif(n1<10,n1+48,n1+55) ) + Chr( Iif(n2<10,n2+48,n2+55) )
    
+STATIC FUNCTION Str2Hex( stroka )
+   LOCAL cRes := "", i, nLen := Len( stroka )
+
+   FOR i := 1 to nLen
+      cRes += Int2Hex( Asc( Substr(stroka,i,1) ) )
+   NEXT
+   RETURN cRes
+
 STATIC FUNCTION Hex2Str( stroka )
    LOCAL cRes := "", i := 1, nLen := Len( stroka )
 
@@ -912,21 +988,97 @@ STATIC FUNCTION Hex2Int( stroka )
    ENDIF
    RETURN res
    
-METHOD clsDebugger:wait4connection()
-   LOCAL n, nSec := Seconds()
-
+METHOD clsDebugger:wait4connection(cStr)
+   LOCAL n, nSec := Seconds(), i
+   ::qTimer:stop()
    DO WHILE .T.
       FSeek( ::handl2, 0, 0 )
       n := Fread( ::handl2, @::cBuffer, Len(::cBuffer) ) 
       IF n > 0
-         IF At("ver", ::cBuffer) > 0
+         IF At(cStr, ::cBuffer) > 0
             EXIT
          ENDIF
       ENDIF
       
       IF Seconds() - nSec > 5
+         hbide_showWarning( cStr + " not answer" )
+         ::qTimer:start()
          RETURN .F.
       ENDIF
+      FOR i:=1 TO 50000//hb_idleSleep not works //todo sleep()
+      NEXT
+
    ENDDO
-   
+   ::qTimer:start()   
    RETURN .T.
+   
+METHOD clsDebugger:ui_init()
+   LOCAL oHeaders
+
+   oHeaders := QStringList()
+    oHeaders:append("Expression")
+    oHeaders:append("Value")
+   ::oUI:tableWatchExpressions:setHorizontalHeaderLabels(oHeaders)
+   oHeaders := QStringList()
+    oHeaders:append("Prg")
+    oHeaders:append("Proc")
+    oHeaders:append("Line")
+   ::oUI:tableStack:setHorizontalHeaderLabels(oHeaders)
+   oHeaders := QStringList()
+    oHeaders:append("Name")
+    oHeaders:append("Type")
+    oHeaders:append("Value")
+   ::oUI:tableVarLocal:setHorizontalHeaderLabels(oHeaders)
+   ::oUI:tableVarPrivate:setHorizontalHeaderLabels(oHeaders)
+   ::oUI:tableVarPublic:setHorizontalHeaderLabels(oHeaders)
+   ::oUI:tableVarStatic:setHorizontalHeaderLabels(oHeaders)
+   
+   ::oUI:btnAddExpression:connect("clicked()", { || ::ui_tableWatch_ins() } )
+   ::oUI:btnDeleteExpression:connect("clicked()", { || ::ui_tableWatch_del() } )
+   ::oUI:btnDeleteExpression:connect("clicked()", { || ::ui_tableWatch_del() } )
+//   ::oUI:tableWatchExpressions:connect("itemChanged(QTableWidgetItem)", { |item| ::addWatch(item) } )
+
+   RETURN NIL
+   
+METHOD clsDebugger:ui_load()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_STACK, "on" )
+   ::wait4connection("stack")
+   ::TimerProc()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_LOCAL, "on" )
+   ::wait4connection("valuelocal")
+   ::TimerProc()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_PRIV, "on" )
+   ::wait4connection("valuepriv")
+   ::TimerProc()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_PUBL, "on" )
+   ::wait4connection("valuepubl")
+   ::TimerProc()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_STATIC, "on" )
+   ::wait4connection("valuestatic")
+   ::TimerProc()
+   
+   RETURN NIL
+   
+METHOD clsDebugger:ui_tableWatch_ins()
+
+   ::oUI:tableWatchExpressions:insertRow(::oUI:tableWatchExpressions:rowCount())
+
+   RETURN NIL
+   
+METHOD clsDebugger:ui_tableWatch_del()
+
+   ::oUI:tableWatchExpressions:RemoveRow(::oUI:tableWatchExpressions:currentRow())
+
+   RETURN NIL
+   
+METHOD clsDebugger:addWatch(item)
+   IF item:column() == 0
+      ::WatchRow := ::oUI:tableWatchExpressions:currentRow()
+      ::oCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
+   ENDIF
+   RETURN NIL
