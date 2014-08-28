@@ -237,8 +237,8 @@ CLASS clsDebugger INHERIT IdeObject
 
    METHOD changeWatch( item )
    
-   METHOD TerminateDebug()
-   METHOD ExitDbg()
+   METHOD terminateDebug()
+   METHOD exitDbg()
 
    ERROR HANDLER __OnError( ... )
 
@@ -925,7 +925,7 @@ METHOD clsDebugger:showAreas( arr, n )
    ELSE
       ::oUI:tableOpenTables:setCurrentCell( 0, 0 )
       ::setMode( MODE_INPUT )
-      ::DoCommand(CMD_REC,cAlias)
+      ::doCommand(CMD_REC,cAlias)
       ::wait4connection( "valuerec" )
       ::timerProc()
    ENDIF
@@ -1114,7 +1114,7 @@ METHOD clsDebugger:ui_init()
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
    ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
 
-   ::oUI:connect( QEvent_Close   , {|| ::ExitDbg() } )
+   ::oUI:connect( QEvent_Close   , {|| ::exitDbg() } )
    RETURN NIL
 
 
@@ -1205,9 +1205,9 @@ METHOD clsDebugger:changeWatch( item )
    RETURN NIL
 
 
-METHOD clsDebugger:TerminateDebug()
+METHOD clsDebugger:terminateDebug()
    ::SetMode( MODE_INPUT )
-   ::DoCommand( CMD_TERMINATE )
+   ::doCommand( CMD_TERMINATE )
    RETURN NIL
 
 
@@ -1227,13 +1227,13 @@ METHOD clsDebugger:requestRecord( row, col )
    ENDIF
 
    ::setMode( MODE_INPUT )
-   ::DoCommand(CMD_REC,cAlias)
+   ::doCommand(CMD_REC,cAlias)
    ::wait4connection( "valuerec" )
    ::timerProc()
    RETURN NIL
 
   
-METHOD clsDebugger:ExitDbg()
+METHOD clsDebugger:exitDbg()
 
    IF ::nExitMode == 1
       IF ::handl1 != -1
