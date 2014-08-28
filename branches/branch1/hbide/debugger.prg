@@ -1,5 +1,5 @@
-         /*
- * $Id: debugger.prg 4 2014-08-27 17:37:29Z alex; $
+/*
+ * $Id: debugger.prg 5 2014-08-28 16:41:52Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -990,6 +990,12 @@ METHOD clsDebugger:showObject( arr, n )
    LOCAL nLen := Val( arr[n] )
 
    ::oUI:tableObjectInspector:setRowCount( nLen )
+
+   IF nLen == 0
+      ::cInspectVar := NIL
+      RETURN NIL
+   ENDIF
+   
    FOR i := 1 TO nLen
       FOR j := 1 TO 3
          ::oUI:tableObjectInspector:setItem( i - 1, j - 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
