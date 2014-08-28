@@ -235,6 +235,8 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD TerminateDebug()
    METHOD ExitDbg()
 
+   ERROR HANDLER __OnError( ... )
+
    ENDCLASS
 
 
@@ -1156,3 +1158,36 @@ METHOD clsDebugger:ExitDbg()
    ::oIde:oDebugger = NIL
 
    RETURN .T.
+
+
+METHOD clsDebugger:__OnError( ... )
+   LOCAL cMsg := __GetMessage()
+   LOCAL oError
+
+   IF SubStr( cMsg, 1, 1 ) == "_"
+      cMsg := SubStr( cMsg, 2 )
+   ENDIF
+
+   IF Left( cMsg, 2 ) == "Q_"
+      IF SubStr( cMsg, 3 ) $ ::oUI:qObj
+         RETURN ::oUI:qObj[ SubStr( cMsg, 3 ) ]
+      ELSE
+         oError := ErrorNew()
+
+//         oError:severity    := ES_ERROR
+//         oError:genCode     := EG_ARG
+         oError:subSystem   := "HBQT"
+         oError:subCode     := 1001
+         oError:canRetry    := .F.
+         oError:canDefault  := .F.
+         oError:Args        := hb_AParams()
+         oError:operation   := ProcName()
+         oError:Description := "Control <" + substr( cMsg, 3 ) + "> does not exist"
+
+         Eval( ErrorBlock(), oError )
+      ENDIF
+   ELSEIF ::oUI:oWidget:hasValidPointer()
+      RETURN ::oUI:oWidget:&cMsg( ... )
+   ENDIF
+
+   RETURN NIL
