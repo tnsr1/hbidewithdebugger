@@ -1175,8 +1175,8 @@ METHOD clsDebugger:__OnError( ... )
       ELSE
          oError := ErrorNew()
 
-//         oError:severity    := ES_ERROR
-//         oError:genCode     := EG_ARG
+         oError:severity    := ES_ERROR
+         oError:genCode     := EG_ARG
          oError:subSystem   := "HBQT"
          oError:subCode     := 1001
          oError:canRetry    := .F.
