@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 7 2014-08-28 20:42:12Z alex; $
+ * $Id: debugger.prg 8 2014-08-28 20:56:12Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -207,10 +207,6 @@ METHOD clsDebugger:init( oIde )
       :start()
    ENDWITH
 
-   DO WHILE ! Empty( ::aBPLoad )
-      hb_idleSleep( 10 )
-   ENDDO
-
    ::oUI = hbqtui_debugger()
    ::ui_init()
 
@@ -253,6 +249,10 @@ METHOD clsDebugger:start( cExe )
    ::timerProc()
 
    ::loadBreakPoints()
+
+   DO WHILE ! Empty( ::aBPLoad )
+      hb_idleSleep( 10 )
+   ENDDO
 
    ::lDebugging := .T.
 
