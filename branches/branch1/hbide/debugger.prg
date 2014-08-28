@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 8 2014-08-28 20:56:12Z alex; $
+ * $Id: debugger.prg 9 2014-08-28 21:31:01Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -251,7 +251,7 @@ METHOD clsDebugger:start( cExe )
    ::loadBreakPoints()
 
    DO WHILE ! Empty( ::aBPLoad )
-      hb_idleSleep( 10 )
+      hb_idleSleep( 0.1 )
    ENDDO
 
    ::lDebugging := .T.
@@ -705,7 +705,6 @@ METHOD clsDebugger:setCurrLine( nLine, cName )
       ::lDebugging := .T.
    ENDIF
 
-   // Text := GetTextObj( cName, @nTab )
    ::setWindow( cName )
    qCursor := ::oIde:qCurEdit:textCursor()
 
@@ -1000,7 +999,7 @@ METHOD clsDebugger:wait4connection( cStr )
          ::qTimer:start()
          RETURN .F.
       ENDIF
-//    hb_idleSleep(10)
+//    hb_idleSleep(0.1)
       FOR i := 1 TO 50000                         //hb_idleSleep not works //todo sleep()
          // empty loop
       NEXT
