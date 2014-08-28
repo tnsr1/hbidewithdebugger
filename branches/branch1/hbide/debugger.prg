@@ -132,7 +132,10 @@ REQUEST HWG_RUNCONSOLEAPP, HWG_RUNAPP
 CLASS clsDebugger INHERIT IdeObject
 
    DATA   oIde
+   
    DATA   nRowWatch
+   
+   DATA   nRowAreas                               INIT 0
 
    DATA   cCurrentProject
    DATA   aSources
@@ -219,6 +222,7 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD showVars( arr, n, nVarType )
    METHOD showWatch( arr, n )
    METHOD showAreas( arr, n )
+   METHOD requestRecord( row, col )
    METHOD showRec( arr, n )
    METHOD showObject( arr, n )
 
@@ -268,7 +272,6 @@ METHOD clsDebugger:init( oIde )
    ENDWITH
 
    DO WHILE ! Empty( ::aBPLoad )
-      ?"! Empty( ::aBPLoad )"
       hb_idleSleep( 10 )
    ENDDO
 
@@ -291,8 +294,6 @@ METHOD clsDebugger:start( cExe )
    FClose( ::handl1 )
    ::handl2 := FCreate( cExe + ".d2" )
    FClose( ::handl2 )
-
-   DirChange( cPath )                             ///////////////////////////////////////// ??? Cannot this be avoided ?
 
    hb_processOpen( cExe )                         //+ Iif( !Empty( cParams ), cParams, "" ) )
 
@@ -449,7 +450,6 @@ METHOD clsDebugger:timerProc()
    LOCAL n, arr
    STATIC nLastSec := 0
 
-   //?"TimerProc():" + Time()
    IF ::nMode != MODE_INPUT
       IF ! Empty( arr := ::dbgRead() )
          IF arr[ 1 ] == "quit"
@@ -566,12 +566,13 @@ METHOD clsDebugger:timerProc()
                      ENDIF
                   ENDDO
                   ::oOutputResult:oWidget:append( /*HWindow():GetMain():handle*/"Debugger (" + arr[ 2 ] + ", line " + arr[ 3 ] + ")" )
+
+                  ::ui_load()
+                  ::oUI:show()
+                  ::oUI:activateWindow()
                ENDIF
                ::setMode( MODE_INPUT )
                nLastSec := Seconds()
-               ::ui_load()
-               ::oUI:show()
-               ::oUI:activateWindow()
 
             ENDIF
          ENDIF
@@ -900,23 +901,52 @@ METHOD clsDebugger:showWatch( arr, n )
 
 
 METHOD clsDebugger:showAreas( arr, n )
-   LOCAL i, j
+   LOCAL i, j, cAlias, item
    LOCAL nAreas := Val( arr[n] )
    LOCAL nAItems := Val( Hex2Str(arr[++n]) )
-
+?"showAreas"
    ::oUI:tableOpenTables:setRowCount( nAreas )
    FOR i := 1 TO nAreas
       FOR j := 1 TO nAItems
-         ::oUI:tableOpenTables:setItem( i - 1, j - 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+         item := QTableWidgetItem( Hex2Str( arr[ ++n ] ) )
+         IF i == 1 .AND. j == 1
+            IF Left(item:text(),1) == "*"
+               cAlias := Right(item:text(), Len(item:text()) - 1)
+            ELSE
+               cAlias = item:text()
+            ENDIF
+         ENDIF
+         ::oUI:tableOpenTables:setItem( i - 1, j - 1, item )
       NEXT
    NEXT
+   
+   IF nAreas == 0
+      ::oUI:tableCurrentRecord:setRowCount( 0 )
+   ELSE
+      ::oUI:tableOpenTables:setCurrentCell( 0, 0 )
+      ::setMode( MODE_INPUT )
+      ::DoCommand(CMD_REC,cAlias)
+      ::wait4connection( "valuerec" )
+      ::timerProc()
+   ENDIF
 
    RETURN NIL
 
 
-METHOD clsDebugger:showRec( arr, n )
-   HB_SYMBOL_UNUSED( arr )
-   HB_SYMBOL_UNUSED( n )
+METHOD clsDebugger:ShowRec( arr, n )
+   LOCAL i, j
+   LOCAL nFields := Val( arr[n] )
+
+//      hwg_Setwindowtext( oInspectDlg:handle, "Record inspector ("+Hex2Str(arr[++n])+", rec."+Hex2Str(arr[++n])+")" )
+//?Hex2Str(arr[++n])
+//?Hex2Str(arr[++n])
+   n := n + 2
+   ::oUI:tableCurrentRecord:setRowCount( nFields )
+   FOR i := 1 TO nFields
+      FOR j := 1 TO 4
+         ::oUI:tableCurrentRecord:setItem( i - 1, j - 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+      NEXT
+   NEXT
    RETURN NIL
 
 
@@ -1059,7 +1089,7 @@ METHOD clsDebugger:ui_init()
 
    WITH OBJECT oHeaders := QStringList()
       :append( "Alias" )
-      :append( "Area №" )
+      :append( "Area" )
       :append( "RDD" )
       :append( "Records" )
       :append( "Current" )
@@ -1069,12 +1099,21 @@ METHOD clsDebugger:ui_init()
       :append( "DEL" )
    ENDWITH
    ::oUI:tableOpenTables:setHorizontalHeaderLabels( oHeaders )
+   
+   WITH OBJECT oHeaders := QStringList()
+      :append( "FieldName" )
+      :append( "Type" )
+      :append( "Len" )
+      :append( "Value" )
+   ENDWITH
+   ::oUI:tableCurrentRecord:setHorizontalHeaderLabels( oHeaders )
 
    ::oUI:btnAddExpression:connect( "clicked()", { || ::ui_tableWatch_ins() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
-   
+   ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
+
    ::oUI:connect( QEvent_Close   , {|| ::ExitDbg() } )
    RETURN NIL
 
@@ -1101,7 +1140,7 @@ METHOD clsDebugger:ui_load()
    ::wait4connection( "valuestatic" )
    ::timerProc()
 
-   ::setMode( MODE_INPUT )   
+   ::setMode( MODE_INPUT )
    ::doCommand( CMD_AREA )
    ::wait4connection( "valueareas" )
    ::timerProc()
@@ -1169,6 +1208,28 @@ METHOD clsDebugger:changeWatch( item )
 METHOD clsDebugger:TerminateDebug()
    ::SetMode( MODE_INPUT )
    ::DoCommand( CMD_TERMINATE )
+   RETURN NIL
+
+
+METHOD clsDebugger:requestRecord( row, col )
+   LOCAL item, cAlias
+   HB_SYMBOL_UNUSED( col )
+   IF row == ::nRowAreas
+      RETURN NIL
+   ELSE 
+      ::nRowAreas := row
+   ENDIF
+   item := ::oUI:tableOpenTables:item(row, 0)
+   IF Left(item:text(),1) == "*"
+      cAlias := Right(item:text(), Len(item:text()) - 1)
+   ELSE
+      cAlias = item:text()
+   ENDIF
+
+   ::setMode( MODE_INPUT )
+   ::DoCommand(CMD_REC,cAlias)
+   ::wait4connection( "valuerec" )
+   ::timerProc()
    RETURN NIL
 
   
