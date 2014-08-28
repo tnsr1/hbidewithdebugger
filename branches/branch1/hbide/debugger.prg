@@ -268,6 +268,7 @@ METHOD clsDebugger:init( oIde )
    ENDWITH
 
    DO WHILE ! Empty( ::aBPLoad )
+      ?"! Empty( ::aBPLoad )"
       hb_idleSleep( 10 )
    ENDDO
 
@@ -899,8 +900,17 @@ METHOD clsDebugger:showWatch( arr, n )
 
 
 METHOD clsDebugger:showAreas( arr, n )
-   HB_SYMBOL_UNUSED( arr )
-   HB_SYMBOL_UNUSED( n )
+   LOCAL i, j
+   LOCAL nAreas := Val( arr[n] )
+   LOCAL nAItems := Val( Hex2Str(arr[++n]) )
+
+   ::oUI:tableOpenTables:setRowCount( nAreas )
+   FOR i := 1 TO nAreas
+      FOR j := 1 TO nAItems
+         ::oUI:tableOpenTables:setItem( i - 1, j - 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+      NEXT
+   NEXT
+
    RETURN NIL
 
 
@@ -1047,6 +1057,19 @@ METHOD clsDebugger:ui_init()
    ::oUI:tableVarPublic:setHorizontalHeaderLabels( oHeaders )
    ::oUI:tableVarStatic:setHorizontalHeaderLabels( oHeaders )
 
+   WITH OBJECT oHeaders := QStringList()
+      :append( "Alias" )
+      :append( "Area №" )
+      :append( "RDD" )
+      :append( "Records" )
+      :append( "Current" )
+      :append( "BOF" )
+      :append( "EOF" )
+      :append( "FOUND" )
+      :append( "DEL" )
+   ENDWITH
+   ::oUI:tableOpenTables:setHorizontalHeaderLabels( oHeaders )
+
    ::oUI:btnAddExpression:connect( "clicked()", { || ::ui_tableWatch_ins() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
@@ -1076,6 +1099,11 @@ METHOD clsDebugger:ui_load()
    ::setMode( MODE_INPUT )
    ::doCommand( CMD_STATIC, "on" )
    ::wait4connection( "valuestatic" )
+   ::timerProc()
+
+   ::setMode( MODE_INPUT )   
+   ::doCommand( CMD_AREA )
+   ::wait4connection( "valueareas" )
    ::timerProc()
    RETURN NIL
 
