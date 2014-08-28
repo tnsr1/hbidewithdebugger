@@ -179,7 +179,7 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   lAnimate                                INIT .F.
    DATA   nAnimate                                INIT 3
 
-   DATA   nExitMode                               INIT 1
+   DATA   nExitMode                               INIT 2
    DATA   nVerProto                               INIT 0
 
    DATA   cIniPath
@@ -231,6 +231,9 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD ui_tableWatch_del()
 
    METHOD changeWatch( item )
+   
+   METHOD TerminateDebug()
+   METHOD ExitDbg()
 
    ENDCLASS
 
@@ -801,11 +804,6 @@ METHOD clsDebugger:setWindow( cPrgName )
 
 METHOD clsDebugger:stopDebug()
 
-   ::oDebugWatch:close()
-   ::oDebugVariables:close()
-   ::oDebugStack:close()
-   ::oDebugWorkAreas:close()
-
    IF ::handl1 != -1
       FClose( ::handl1 )
       FClose( ::handl2 )
@@ -1011,6 +1009,7 @@ METHOD clsDebugger:wait4connection( cStr )
          ::qTimer:start()
          RETURN .F.
       ENDIF
+//    hb_idleSleep(10)
       FOR i := 1 TO 50000                         //hb_idleSleep not works //todo sleep()
          // empty loop
       NEXT
@@ -1049,6 +1048,8 @@ METHOD clsDebugger:ui_init()
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
+   
+   ::oUI:connect( QEvent_Close   , {|| ::ExitDbg() } )
    RETURN NIL
 
 
@@ -1132,3 +1133,26 @@ METHOD clsDebugger:changeWatch( item )
       ::doCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
    ENDIF
    RETURN NIL
+
+
+METHOD clsDebugger:TerminateDebug()
+   ::SetMode( MODE_INPUT )
+   ::DoCommand( CMD_TERMINATE )
+   RETURN NIL
+
+  
+METHOD clsDebugger:ExitDbg()
+
+   IF ::nExitMode == 1
+      IF ::handl1 != -1
+         ::Send( "cmd", "exit" )
+      ENDIF
+   ELSEIF ::nExitMode == 2
+      ::Send( "cmd", "quit" )
+   ENDIF
+   ::lDebugging := .F.
+   ::StopDebug()
+
+   ::oIde:oDebugger = NIL
+
+   RETURN .T.
