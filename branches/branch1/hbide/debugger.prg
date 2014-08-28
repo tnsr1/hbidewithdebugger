@@ -60,6 +60,7 @@
 #include "hbide.ch"
 #include "common.ch"
 #include "hbclass.ch"
+#include "error.ch"
 #include "hbqtgui.ch"
 
 #define MODE_INPUT                                1
