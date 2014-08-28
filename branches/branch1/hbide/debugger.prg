@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 5 2014-08-28 16:41:52Z alex; $
+ * $Id: debugger.prg 6 2014-08-28 16:47:52Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -164,7 +164,7 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   oBtnExp
    DATA   oMainFont
 
-   DATA   cInspectVar
+   DATA   cInspectVar                             INIT ""
    DATA   lViewCmd                                INIT .T.
    DATA   oTabMain
    DATA   nTabsMax                                INIT 5
@@ -992,7 +992,7 @@ METHOD clsDebugger:showObject( arr, n )
    ::oUI:tableObjectInspector:setRowCount( nLen )
 
    IF nLen == 0
-      ::cInspectVar := NIL
+      ::cInspectVar := ""
       RETURN NIL
    ENDIF
    
