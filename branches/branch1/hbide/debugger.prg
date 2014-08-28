@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 6 2014-08-28 16:47:52Z alex; $
+ * $Id: debugger.prg 6 2014-08-28 18:46:28Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
@@ -228,8 +228,6 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD showRec( arr, n )
    METHOD showObject( arr, n )
 
-   METHOD hu_Get( cTitle, tpict, txget )
-   METHOD setPath( cRes, cName, lClear )
    METHOD wait4connection( cStr )
 
    METHOD ui_init()
@@ -417,7 +415,6 @@ METHOD clsDebugger:toggleBreakPoint( cAns, cLine )
          ::aBP[ i,1 ] := 0
       ENDIF
    ENDIF
-   //::setCurrLine(nLine, ::cPrgName)
    RETURN NIL
 
 
@@ -542,7 +539,6 @@ METHOD clsDebugger:timerProc()
                ELSE
                   IF ! ( ::cPrgName == arr[ 2 ] )
                      ::cPrgName := arr[ 2 ]
-                     ::setPath( ::cPaths, ::cPrgName )
                   ENDIF
                   ::oUi:labelStatus:setText("Stoped")
                   ::setCurrLine( ::nCurrLine := Val( arr[ 3 ] ), ::cPrgName )
@@ -649,7 +645,6 @@ METHOD clsDebugger:getBP( nLine, cPrg )
 METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
    IF ::nMode == MODE_INPUT
       IF nCmd == CMD_GO
-         // ::setWindow( ::cPrgName )
          ::oUi:labelStatus:setText("Program executing")
          ::send( "cmd", "go" )
 
@@ -1003,33 +998,6 @@ METHOD clsDebugger:showObject( arr, n )
    NEXT
 
    RETURN NIL
-
-
-METHOD clsDebugger:setPath( cRes, cName, lClear )
-   LOCAL arr, i, cFull
-
-   HB_SYMBOL_UNUSED( lClear )
-
-   IF !Empty( cRes ) .OR. ! Empty( cRes := ::hu_Get( "Path to source files", "@S256", ::cPaths ) )
-      ::cPaths := iif( Left( cRes,1 ) != ";", ";" + cRes, cRes )
-      arr := hb_aTokens( ::cPaths, ";" )
-      IF ! Empty( cName )
-         FOR i := 1 TO Len( arr )
-            cFull := arr[ i ] + iif( Empty( arr[ i ] ) .OR. Right( arr[ i ], 1 ) $ "\/", "", hb_OsPathSeparator() ) + ::cPrgName
-            IF ::SetWindow( cFull )
-               EXIT
-            ENDIF
-         NEXT
-      ENDIF
-   ENDIF
-   RETURN NIL
-
-
-METHOD clsDebugger:hu_Get( cTitle, tpict, txget )
-   HB_SYMBOL_UNUSED( cTitle )
-   HB_SYMBOL_UNUSED( tpict )
-   HB_SYMBOL_UNUSED( txget )
-   RETURN ""
 
 
 STATIC FUNCTION Int2Hex( n )
