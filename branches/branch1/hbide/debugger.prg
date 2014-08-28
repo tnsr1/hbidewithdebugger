@@ -218,7 +218,7 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD setWindow( cPrgName )
    METHOD stopDebug()
 
-   METHOD inspectObject()
+   METHOD inspectObject( lClicked )
 
    METHOD showStack( arr, n )
    METHOD showVars( arr, n, nVarType )
@@ -469,10 +469,11 @@ METHOD clsDebugger:timerProc()
                      IF ! Empty( ::cInspectVar )
                         IF Substr( Hex2Str( arr[ 3 ] ), 2, 1 ) == "O"
                            ::nMode := MODE_INPUT
-                           ::inspectObject( ::cInspectVar )
-                           ::cInspectVar := NIL
+                           ::inspectObject(.F.)
+//                           ::cInspectVar := NIL
                            RETURN NIL
                         ELSE
+                           ::oUI:tableObjectInspector:setRowCount( 0 )
                            hbide_showWarning( ::cInspectVar + " isn't an object" )
                            ::oUI:activateWindow()
                         ENDIF
@@ -842,36 +843,44 @@ METHOD clsDebugger:stopDebug()
    RETURN NIL
 
 
-METHOD clsDebugger:inspectObject()
-   LOCAL index, oTable, cType, nRow, cObjName
-
-   index := ::oUI:tabWidget:currentIndex()
-   DO CASE
-   CASE index = 0
-      oTable := ::oUI:tableVarLocal
-   CASE index = 1
-      oTable := ::oUI:tableVarPrivate
-   CASE index = 2
-      oTable := ::oUI:tableVarPublic
-   CASE index = 3
-      oTable := ::oUI:tableVarStatic
-   ENDCASE
+METHOD clsDebugger:inspectObject( lClicked )
+   LOCAL index, oTable, nRow, cObjName
+   LOCAL cType := ""
+   IF lClicked
+      index := ::oUI:tabWidget:currentIndex()
+      DO CASE
+      CASE index = 0
+         oTable := ::oUI:tableVarLocal
+      CASE index = 1
+         oTable := ::oUI:tableVarPrivate
+      CASE index = 2
+         oTable := ::oUI:tableVarPublic
+      CASE index = 3
+         oTable := ::oUI:tableVarStatic
+      ENDCASE
    
-   IF oTable:rowCount() == 0
-      RETURN NIL
-   ENDIF
+      IF oTable:rowCount() == 0
+         RETURN NIL
+      ENDIF
 
-   nRow := oTable:currentRow()
-   cType := oTable:item(nRow, 1):text()
-   IF cType != "O"//! ( cType $ "OA")
-      hbide_showWarning( "Select object in table, please." )
-      ::oUI:activateWindow()
-      RETURN NIL
+      nRow := oTable:currentRow()
+      IF nRow >= 0
+         cType := oTable:item(nRow, 1):text()
+      ENDIF
+      IF cType != "O"//! ( cType $ "OA")
+         hbide_showWarning( "Select object in table, please." )
+         ::oUI:activateWindow()
+         RETURN NIL
+      ENDIF
+   
+      cObjName := oTable:item(nRow, 0):text()
+      ::cInspectVar := cObjName
    ENDIF
    
-   cObjName := oTable:item(nRow, 0):text()
-
-   ::doCommand( CMD_OBJECT, cObjName )
+   ::setMode( MODE_INPUT )
+   ::doCommand( CMD_OBJECT, ::cInspectVar )
+   ::wait4connection( "valueobj" )
+   ::timerProc()
    RETURN NIL
 
 
@@ -1076,13 +1085,20 @@ METHOD clsDebugger:wait4connection( cStr )
       FSeek( ::handl2, 0, 0 )
       n := Fread( ::handl2, @::cBuffer, Len( ::cBuffer ) )
       IF n > 0
-         IF At( cStr, ::cBuffer ) > 0
-            EXIT
+         IF cStr == "ok"
+            IF At( "err", ::cBuffer ) > 0 .OR. At( "ok", ::cBuffer ) > 0
+               EXIT
+            ENDIF
+         ELSE
+            IF At( cStr, ::cBuffer ) > 0
+               EXIT
+            ENDIF
          ENDIF
       ENDIF
 
       IF Seconds() - nSec > 5
-         hbide_showWarning( "Waited for " + cStr + ". Not answer. May be a bad query." )
+         ::oOutputResult:oWidget:append( "Waited for " + cStr + ". Not answer. May be a bad query." )
+//         hbide_showWarning( "Waited for " + cStr + ". Not answer. May be a bad query." )
          ::oUI:activateWindow()
          ::qTimer:start()
          RETURN .F.
@@ -1160,7 +1176,7 @@ METHOD clsDebugger:ui_init()
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
    ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
-   ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject() } )
+   ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject(.T.) } )
    ::oUI:connect( QEvent_Close   , {|| ::exitDbg() } )
    RETURN NIL
 
@@ -1191,6 +1207,12 @@ METHOD clsDebugger:ui_load()
    ::doCommand( CMD_AREA )
    ::wait4connection( "valueareas" )
    ::timerProc()
+   
+   IF ! Empty( ::cInspectVar )
+      ::inspectObject(.F.)
+   ENDIF
+   
+   ::doCommand( CMD_WATCH, "on")
    RETURN NIL
 
 
