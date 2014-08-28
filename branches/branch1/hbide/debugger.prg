@@ -1,8 +1,8 @@
 /*
- * $Id: debugger.prg 6 2014-08-28 18:46:28Z alex; $
+ * $Id: debugger.prg 7 2014-08-28 20:42:12Z alex; $
  */
 
-/* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolski(pepan@mail.ru))
+/* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
  * (HWGUI - Harbour Win32 GUI library source code)
  * The GUI Debugger
  *
@@ -60,7 +60,6 @@
 #include "hbide.ch"
 #include "common.ch"
 #include "hbclass.ch"
-#include "error.ch"
 #include "hbqtgui.ch"
 
 #define MODE_INPUT                                1
@@ -109,23 +108,6 @@
 
 #define EDIT_RES                                  1900
 
-/*
-#define MENU_VIEW                                 1901
-#define MENU_STACK                                1902
-#define MENU_VARS                                 1903
-#define MENU_WATCH                                1904
-#define MENU_RUN                                  1905
-#define MENU_INIT                                 1906
-#define MENU_QUIT                                 1907
-#define MENU_EXIT                                 1908
-#define MENU_BRP                                  1909
-#define MENU_CMDLINE                              1910
-
-REQUEST GETENV, HB_FGETDATETIME
-REQUEST HB_OSPATHLISTSEPARATOR
-REQUEST HWG_RUNCONSOLEAPP, HWG_RUNAPP
-*/
-
 #define cMsgNotSupp                               "Command isn't supported"
 
 
@@ -141,34 +123,17 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   aSources
    DATA   oOutputResult
 
-   DATA   lModeIde                                INIT .T.
    DATA   lDebugging                              INIT .F.
-   DATA   hHrbProj
    DATA   handl1                                  INIT -1
    DATA   handl2
    DATA   cBuffer
    DATA   nId1                                    INIT 0
    DATA   nId2                                    INIT -1
 
-   DATA   oIni
-   DATA   cHrbPath                                INIT "hrb"
    DATA   cAppName
    DATA   cPrgName                                INIT ""
-   DATA   cTextLocate
-   DATA   nLineLocate
-
-   DATA   oTimer
-
-   DATA   oSayState
-   DATA   oEditExpr
-   DATA   oBtnExp
-   DATA   oMainFont
 
    DATA   cInspectVar                             INIT ""
-   DATA   lViewCmd                                INIT .T.
-   DATA   oTabMain
-   DATA   nTabsMax                                INIT 5
-   DATA   cPaths                                  INIT ";"
 
    DATA   aBP                                     INIT {}
    DATA   aWatches                                INIT {}
@@ -180,22 +145,12 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   nLineBP
    DATA   aBPLoad                                 INIT {}
    DATA   nBPLoad
-   DATA   lAnimate                                INIT .F.
-   DATA   nAnimate                                INIT 3
 
    DATA   nExitMode                               INIT 2
    DATA   nVerProto                               INIT 0
 
-   DATA   cIniPath
-   DATA   cCurrPath
-
    DATA   qTimer
    DATA   aTabs
-
-   DATA   oDebugWatch
-   DATA   oDebugVariables
-   DATA   oDebugStack
-   DATA   oDebugWorkAreas
 
    DATA   oUI
 
@@ -240,8 +195,6 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD terminateDebug()
    METHOD exitDbg()
 
-   ERROR HANDLER __OnError( ... )
-
    ENDCLASS
 
 
@@ -249,7 +202,6 @@ METHOD clsDebugger:init( oIde )
    ::oIde      := oIde
    ::aBP       := {}
    ::aWatches  := {}
-   ::aExpr     := {}
    ::nCurrLine := 0
    ::nId1      := 0
    ::nId2      := -1
@@ -259,11 +211,6 @@ METHOD clsDebugger:init( oIde )
    ::cBuffer         := Space( BUFF_LEN )
    ::aTabs           := ::oIde:aTabs
    ::oOutputResult   := ::oIde:oOutputResult
-
-   ::oDebugWatch     := ::oIde:oDebugWatch
-   ::oDebugVariables := ::oIde:oDebugVariables
-   ::oDebugStack     := ::oIde:oDebugStack
-   ::oDebugWorkAreas := ::oIde:oDebugWorkAreas
 
    WITH OBJECT ::qTimer := QTimer()
       :setInterval( 30 )
@@ -371,24 +318,21 @@ METHOD clsDebugger:clearBreakPoints( cPrg )
 
    FOR n := 1 TO Len( ::aBP )
       IF ( Empty( cPrg ) .OR. cPrg == ::aBP[ n,2 ] ) .AND. ::aBP[ n,1 ] <> 0
-         ::addBreakPoint( ::aBP[ n,2 ], ::aBP[ n,1 ] )
-         DO WHILE .T.
-            EXIT
-            //???
-         ENDDO
+         ::deleteBreakPoint( ::aBP[ n,2 ], ::aBP[ n,1 ] )
+         ::wait4connection("ok")
       ENDIF
    NEXT
    RETURN .T.
 
 
 METHOD clsDebugger:deleteBreakPoint( cPrg, nLine )
+      ::oOutputResult:oWidget:append( "Deleting break point: " + cPrg + ": " + Str( nLine ) )
       ::send( "brp", "del", cPrg, LTrim( Str( nLine ) ) )
       IF ::nMode != MODE_WAIT_ANS
          ::nAnsType := ANS_BRP
          ::cPrgBP   := cPrg
          ::nLineBP  := nLine
          ::setMode( MODE_WAIT_ANS )
-         //::TimerProc()
       ENDIF
    RETURN .T.
 
@@ -423,13 +367,7 @@ METHOD clsDebugger:addBreakPoint( cPrg, nLine )
    IF ::nMode != MODE_INPUT .AND. Empty( ::aBPLoad )
       RETURN NIL
    ENDIF
-   //   IF ::nLine == NIL
-   //      ::nLine := GetCurrLine()
-   //   ENDIF
 
-   //      IF cPrg == NIL
-   //         cPrg := oText:cargo
-   //      ENDIF
    IF .T.
       IF ::getBP( nLine, cPrg ) == 0
          ::oOutputResult:oWidget:append( "Setting break point: " + cPrg + ": " + Str( nLine ) )
@@ -582,9 +520,6 @@ METHOD clsDebugger:timerProc()
          ENDIF
       ENDIF
 
-   ELSEIF ::lAnimate .AND. Seconds() - nLastSec > ::nAnimate
-      ::send( "cmd", "step" )
-      ::setMode( MODE_WAIT_BR )
    ENDIF
    RETURN NIL
 
@@ -628,7 +563,6 @@ METHOD clsDebugger:SetMode( newMode )
       IF newMode == MODE_WAIT_ANS .OR. newMode == MODE_WAIT_BR
          IF newMode == MODE_WAIT_BR
             ::nCurrLine := 0
-            //SetCurrLine()
          ENDIF
       ELSEIF newMode == MODE_INIT
          ::lDebugging := .F.
@@ -1291,36 +1225,3 @@ METHOD clsDebugger:exitDbg()
    ::oIde:oDebugger = NIL
 
    RETURN .T.
-
-
-METHOD clsDebugger:__OnError( ... )
-   LOCAL cMsg := __GetMessage()
-   LOCAL oError
-
-   IF SubStr( cMsg, 1, 1 ) == "_"
-      cMsg := SubStr( cMsg, 2 )
-   ENDIF
-
-   IF Left( cMsg, 2 ) == "Q_"
-      IF SubStr( cMsg, 3 ) $ ::oUI:qObj
-         RETURN ::oUI:qObj[ SubStr( cMsg, 3 ) ]
-      ELSE
-         oError := ErrorNew()
-
-         oError:severity    := ES_ERROR
-         oError:genCode     := EG_ARG
-         oError:subSystem   := "HBQT"
-         oError:subCode     := 1001
-         oError:canRetry    := .F.
-         oError:canDefault  := .F.
-         oError:Args        := hb_AParams()
-         oError:operation   := ProcName()
-         oError:Description := "Control <" + substr( cMsg, 3 ) + "> does not exist"
-
-         Eval( ErrorBlock(), oError )
-      ENDIF
-   ELSEIF ::oUI:oWidget:hasValidPointer()
-      RETURN ::oUI:oWidget:&cMsg( ... )
-   ENDIF
-
-   RETURN NIL
