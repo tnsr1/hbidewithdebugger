@@ -96,17 +96,6 @@
 #define CMD_TERMINATE                             18
 
 #define BUFF_LEN                                  1024
-#define RES_LEN                                   100
-
-#define  CLR_LGREEN                               12507070
-#define  CLR_GREEN                                32768
-#define  CLR_DBLUE                                8404992
-#define  CLR_LBLUE1                               16759929
-#define  CLR_LBLUE2                               16764831
-#define  CLR_LIGHT1                               15132390
-#define  CLR_LIGHT2                               12632256
-
-#define EDIT_RES                                  1900
 
 #define cMsgNotSupp                               "Command isn't supported"
 
@@ -119,7 +108,6 @@ CLASS clsDebugger INHERIT IdeObject
    
    DATA   nRowAreas                               INIT 0
 
-   DATA   cCurrentProject
    DATA   aSources
    DATA   oOutputResult
 
@@ -137,7 +125,6 @@ CLASS clsDebugger INHERIT IdeObject
 
    DATA   aBP                                     INIT {}
    DATA   aWatches                                INIT {}
-   DATA   aExpr                                   INIT {}
    DATA   nCurrLine                               INIT 0
    DATA   nMode                                   INIT MODE_INPUT
    DATA   nAnsType
@@ -153,6 +140,8 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   aTabs
 
    DATA   oUI
+   
+   DATA   cCurrentProject
 
    METHOD init( oIde )
    METHOD start( cExe )
