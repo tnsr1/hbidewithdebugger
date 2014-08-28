@@ -211,12 +211,14 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD send( ... )
    METHOD setMode( newMode )
    METHOD setCurrLine( nLine, cName )
+   METHOD getCurrLine()
+   METHOD getCurrPrgName()
    METHOD getBP( nLine, cPrg )
    METHOD doCommand( nCmd, cDop, cDop2 )
    METHOD setWindow( cPrgName )
    METHOD stopDebug()
 
-   METHOD inspectObject( cObjName )
+   METHOD inspectObject()
 
    METHOD showStack( arr, n )
    METHOD showVars( arr, n, nVarType )
@@ -320,6 +322,8 @@ METHOD clsDebugger:start( cExe )
 
    ::lDebugging := .T.
 
+   ::oOutputResult:oWidget:append( "Debug started." )
+   
    ::doCommand( CMD_GO )
    RETURN .T.
 
@@ -408,6 +412,7 @@ METHOD clsDebugger:toggleBreakPoint( cAns, cLine )
    ELSE
       IF ( i := ::getBP( nLine, ::cPrgBP ) ) == 0
          hbide_showWarning( "Error deleting BP line " + cLine )
+         ::oUI:activateWindow()
       ELSE
          ::aBP[ i,1 ] := 0
       ENDIF
@@ -469,6 +474,7 @@ METHOD clsDebugger:timerProc()
                            RETURN NIL
                         ELSE
                            hbide_showWarning( ::cInspectVar + " isn't an object" )
+                           ::oUI:activateWindow()
                         ENDIF
                      ELSE
                         //???  ::SetResult( Hex2Str( arr[3] ) )
@@ -537,6 +543,7 @@ METHOD clsDebugger:timerProc()
                      ::cPrgName := arr[ 2 ]
                      ::setPath( ::cPaths, ::cPrgName )
                   ENDIF
+                  ::oUi:labelStatus:setText("Stoped")
                   ::setCurrLine( ::nCurrLine := Val( arr[ 3 ] ), ::cPrgName )
                   n := 4
                   DO WHILE .T.
@@ -565,7 +572,7 @@ METHOD clsDebugger:timerProc()
                         EXIT
                      ENDIF
                   ENDDO
-                  ::oOutputResult:oWidget:append( /*HWindow():GetMain():handle*/"Debugger (" + arr[ 2 ] + ", line " + arr[ 3 ] + ")" )
+                  ::oOutputResult:oWidget:append( "Debugger (" + arr[ 2 ] + ", line " + arr[ 3 ] + ")" )
 
                   ::ui_load()
                   ::oUI:show()
@@ -642,13 +649,16 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
    IF ::nMode == MODE_INPUT
       IF nCmd == CMD_GO
          // ::setWindow( ::cPrgName )
+         ::oUi:labelStatus:setText("Program executing")
          ::send( "cmd", "go" )
 
       ELSEIF nCmd == CMD_STEP
+         ::oUi:labelStatus:setText("Program executing")
          ::send( "cmd", "step" )
 
       ELSEIF nCmd == CMD_TOCURS
-         ::send( "cmd", "to", ::cPrgName, Ltrim( Str( ::getCurrLine() ) ) )
+         ::oUi:labelStatus:setText("Program executing")
+         ::send( "cmd", "to", ::getCurrPrgName(), Ltrim( Str( ::getCurrLine() ) ) )
 
       ELSEIF nCmd == CMD_TRACE
          ::send( "cmd", "trace" )
@@ -681,6 +691,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
             ::setMode( MODE_WAIT_ANS )
          ELSE
             hbide_showWarning( cMsgNotSupp )
+            ::oUI:activateWindow()
          ENDIF
          RETURN NIL
 
@@ -691,6 +702,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
             ::setMode( MODE_WAIT_ANS )
          ELSE
             hbide_showWarning( cMsgNotSupp )
+            ::oUI:activateWindow()
          ENDIF
          RETURN NIL
 
@@ -701,6 +713,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
             ::setMode( MODE_WAIT_ANS )
          ELSE
             hbide_showWarning( cMsgNotSupp )
+            ::oUI:activateWindow()
          ENDIF
          RETURN NIL
 
@@ -727,6 +740,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
             ::setMode( MODE_WAIT_ANS )
          ELSE
             hbide_showWarning( cMsgNotSupp )
+            ::oUI:activateWindow()
          ENDIF
          RETURN NIL
 
@@ -737,6 +751,7 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
             ::setMode( MODE_WAIT_ANS )
          ELSE
             hbide_showWarning( cMsgNotSupp )
+            ::oUI:activateWindow()
          ENDIF
          RETURN NIL
 
@@ -767,11 +782,6 @@ METHOD clsDebugger:DoCommand( nCmd, cDop, cDop2 )
 METHOD clsDebugger:setCurrLine( nLine, cName )
    LOCAL qCursor
 
-   IF PCount() < 2
-      hbide_showWarning( "Not all parameters passed into clsDebugger:SetCurrLine" )
-      RETURN .F.
-   ENDIF
-
    IF ! ::lDebugging
       ::lDebugging := .T.
    ENDIF
@@ -784,9 +794,21 @@ METHOD clsDebugger:setCurrLine( nLine, cName )
    ::oIde:qCurEdit:setTextCursor( qCursor )
    ::oIde:manageFocusInEditor()
 
-   // IF !Empty( nLine ) .AND. oText:nTextLen >= nLine
-   //    oText:GoTo( nLine )
+   ::oUI:activateWindow()
+   
    RETURN NIL
+
+
+METHOD clsDebugger:getCurrLine()
+   LOCAL qCursor
+   qCursor := ::oIde:qCurEdit:textCursor()
+   RETURN qCursor:blockNumber() + 1
+
+
+METHOD clsDebugger:getCurrPrgName()
+   LOCAL oEditor
+   oEditor := ::oIde:oCurEditor
+   RETURN (oEditor:cFile + oEditor:cExt)
 
 
 METHOD clsDebugger:setWindow( cPrgName )
@@ -814,37 +836,41 @@ METHOD clsDebugger:stopDebug()
       FClose( ::handl2 )
       ::handl1 := -1
    ENDIF
+   
+   ::oUi:labelStatus:setText("Exited")
+   
    RETURN NIL
 
 
-METHOD clsDebugger:inspectObject( cObjName )
-   //LOCAL oDlg, oBrw
+METHOD clsDebugger:inspectObject()
+   LOCAL index, oTable, cType, nRow, cObjName
 
-/*
-   INIT DIALOG oDlg TITLE "Object inspector ("+cObjName+")" AT 30, 30 SIZE 480, 400 ;
-     FONT HWindow():GetMain():oFont
+   index := ::oUI:tabWidget:currentIndex()
+   DO CASE
+   CASE index = 0
+      oTable := ::oUI:tableVarLocal
+   CASE index = 1
+      oTable := ::oUI:tableVarPrivate
+   CASE index = 2
+      oTable := ::oUI:tableVarPublic
+   CASE index = 3
+      oTable := ::oUI:tableVarStatic
+   ENDCASE
+   
+   IF oTable:rowCount() == 0
+      RETURN NIL
+   ENDIF
 
-   @ 0,0 BROWSE oBrw ARRAY OF oDlg          ;
-         SIZE 480,340                       ;
-         FONT HWindow():GetMain():oFont     ;
-         STYLE WS_VSCROLL                   ;
-         ON SIZE ANCHOR_TOPABS + ANCHOR_LEFTABS + ANCHOR_RIGHTABS + ANCHOR_BOTTOMABS
+   nRow := oTable:currentRow()
+   cType := oTable:item(nRow, 1):text()
+   IF cType != "O"//! ( cType $ "OA")
+      hbide_showWarning( "Select object in table, please." )
+      ::oUI:activateWindow()
+      RETURN NIL
+   ENDIF
+   
+   cObjName := oTable:item(nRow, 0):text()
 
-   oBrw:aArray := {}
-   oBrw:AddColumn( HColumn():New( "Name",{|v,o|o:aArray[o:nCurrent,1]},"C",12,0 ) )
-   oBrw:AddColumn( HColumn():New( "Type",{|v,o|o:aArray[o:nCurrent,2]},"C",2,0 ) )
-   oBrw:AddColumn( HColumn():New( "Value",{|v,o|o:aArray[o:nCurrent,3]},"C",60,0 ) )
-
-   oBrw:bcolorSel := oBrw:htbcolor := CLR_LGREEN
-   oBrw:tcolorSel := oBrw:httcolor := 0
-
-   @ 45, 360 BUTTON "Refresh" ON CLICK {|| oInspectDlg:=oDlg,DoCommand(CMD_OBJECT,cObjName) } SIZE 100, 28 ON SIZE ANCHOR_BOTTOMABS
-   @ 335, 360 BUTTON "Close" ON CLICK {|| oDlg:Close() } SIZE 100, 28 ON SIZE ANCHOR_RIGHTABS + ANCHOR_BOTTOMABS
-
-   ACTIVATE DIALOG oDlg NOMODAL
-
-   oInspectDlg := oDlg
-*/
    ::doCommand( CMD_OBJECT, cObjName )
    RETURN NIL
 
@@ -904,7 +930,7 @@ METHOD clsDebugger:showAreas( arr, n )
    LOCAL i, j, cAlias, item
    LOCAL nAreas := Val( arr[n] )
    LOCAL nAItems := Val( Hex2Str(arr[++n]) )
-?"showAreas"
+
    ::oUI:tableOpenTables:setRowCount( nAreas )
    FOR i := 1 TO nAreas
       FOR j := 1 TO nAItems
@@ -951,8 +977,16 @@ METHOD clsDebugger:ShowRec( arr, n )
 
 
 METHOD clsDebugger:showObject( arr, n )
-   HB_SYMBOL_UNUSED( arr )
-   HB_SYMBOL_UNUSED( n )
+   LOCAL i, j
+   LOCAL nLen := Val( arr[n] )
+
+   ::oUI:tableObjectInspector:setRowCount( nLen )
+   FOR i := 1 TO nLen
+      FOR j := 1 TO 3
+         ::oUI:tableObjectInspector:setItem( i - 1, j - 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+      NEXT
+   NEXT
+
    RETURN NIL
 
 
@@ -1048,7 +1082,8 @@ METHOD clsDebugger:wait4connection( cStr )
       ENDIF
 
       IF Seconds() - nSec > 5
-         hbide_showWarning( cStr + " not answer" )
+         hbide_showWarning( "Waited for " + cStr + ". Not answer. May be a bad query." )
+         ::oUI:activateWindow()
          ::qTimer:start()
          RETURN .F.
       ENDIF
@@ -1108,12 +1143,24 @@ METHOD clsDebugger:ui_init()
    ENDWITH
    ::oUI:tableCurrentRecord:setHorizontalHeaderLabels( oHeaders )
 
+   WITH OBJECT oHeaders := QStringList()
+      :append( "Name" )
+      :append( "Type" )
+      :append( "Value" )
+   ENDWITH
+   ::oUI:tableObjectInspector:setHorizontalHeaderLabels( oHeaders )
+
+   ::oUI:btnGo:connect( "clicked()", { || ::doCommand( CMD_GO ) } )
+   ::oUI:btnStep:connect( "clicked()", { || ::doCommand( CMD_STEP ) } )
+   ::oUI:btnToCursor:connect( "clicked()", { || ::doCommand( CMD_TOCURS ) } )
+   ::oUI:btnExit:connect( "clicked()", { || ::exitDbg() } )
+
    ::oUI:btnAddExpression:connect( "clicked()", { || ::ui_tableWatch_ins() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
    ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
-
+   ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject() } )
    ::oUI:connect( QEvent_Close   , {|| ::exitDbg() } )
    RETURN NIL
 
@@ -1148,7 +1195,7 @@ METHOD clsDebugger:ui_load()
 
 
 METHOD clsDebugger:ui_tableWatch_ins()
-   ::oUI:tableWatchExpressions:insertRow( ::oUI:tableWatchExpressions:RowCount() )
+   ::oUI:tableWatchExpressions:insertRow( ::oUI:tableWatchExpressions:rowCount() )
    AAdd( ::aWatches, { ::oUI:tableWatchExpressions:rowCount() - 1, "" } )
    RETURN NIL
 
@@ -1177,12 +1224,12 @@ METHOD clsDebugger:ui_tableWatch_del()
 
 METHOD clsDebugger:changeWatch( item )
    LOCAL i
-   LOCAL rc := ::oUI:tableWatchExpressions:RowCount()
+   LOCAL rc := ::oUI:tableWatchExpressions:rowCount()
    LOCAL r := 0
 
    IF item:column() == 0
       FOR i := 1 TO Len( ::aWatches )
-         IF ::aWatches[ i,1 ] == item:Row()
+         IF ::aWatches[ i,1 ] == item:row()
             IF Empty( ::aWatches[ i,2 ] )
                ::aWatches[ i,2 ] := item:text()
                ::nRowWatch := item:Row()

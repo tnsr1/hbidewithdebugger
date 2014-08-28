@@ -45,30 +45,30 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QToolButton" name="btnFile">
+       <widget class="QToolButton" name="btnGo">
         <property name="text">
-         <string>File</string>
+         <string>Go</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QToolButton" name="btnBreakPoints">
+       <widget class="QToolButton" name="btnStep">
         <property name="text">
-         <string>BreakPoints</string>
+         <string>Step</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QToolButton" name="btnOptions">
+       <widget class="QToolButton" name="btnToCursor">
         <property name="text">
-         <string>Options</string>
+         <string>To cursor</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QToolButton" name="btnAbout">
+       <widget class="QToolButton" name="btnExit">
         <property name="text">
-         <string>About</string>
+         <string>Exit</string>
         </property>
        </widget>
       </item>
@@ -263,6 +263,9 @@
              <layout class="QVBoxLayout" name="verticalLayout_6">
               <item>
                <widget class="QLabel" name="labelVariables">
+                <property name="enabled">
+                 <bool>true</bool>
+                </property>
                 <property name="text">
                  <string>Variables</string>
                 </property>
@@ -466,7 +469,21 @@
                </widget>
               </item>
               <item>
-               <widget class="QTableWidget" name="tableObjectInspector"/>
+               <widget class="QPushButton" name="btnInspect">
+                <property name="text">
+                 <string>Inspect selected object</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QTableWidget" name="tableObjectInspector">
+                <property name="columnCount">
+                 <number>3</number>
+                </property>
+                <column/>
+                <column/>
+                <column/>
+               </widget>
               </item>
              </layout>
             </widget>
@@ -495,20 +512,11 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QLabel" name="labelCommand">
-        <property name="maximumSize">
-         <size>
-          <width>60</width>
-          <height>16777215</height>
-         </size>
-        </property>
+       <widget class="QLabel" name="labelStatus">
         <property name="text">
-         <string>Command:</string>
+         <string>Initing...</string>
         </property>
        </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="editCommand"/>
       </item>
      </layout>
     </widget>
