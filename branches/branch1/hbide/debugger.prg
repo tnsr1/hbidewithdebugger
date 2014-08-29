@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 11 2014-08-29 07:26:36Z alex; $
+ * $Id: debugger.prg 12 2014-08-29 13:22:56Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -876,6 +876,7 @@ METHOD clsDebugger:showAreas( arr, n )
       ::oUI:tableCurrentRecord:setRowCount( 0 )
    ELSE
       ::oUI:tableOpenTables:setCurrentCell( 0, 0 )
+      ::nRowAreas := 0
       ::setMode( MODE_INPUT )
       ::doCommand(CMD_REC,cAlias)
       ::wait4connection( "valuerec" )
