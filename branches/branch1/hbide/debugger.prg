@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 12 2014-08-29 13:22:56Z alex; $
+ * $Id: debugger.prg 13 2014-08-29 16:53:08Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -853,7 +853,7 @@ METHOD clsDebugger:showWatch( arr, n )
 
 
 METHOD clsDebugger:showAreas( arr, n )
-   LOCAL i, j, cAlias, item
+   LOCAL i, j, item
    LOCAL nAreas := Val( arr[n] )
    LOCAL nAItems := Val( Hex2Str(arr[++n]) )
 
@@ -861,13 +861,6 @@ METHOD clsDebugger:showAreas( arr, n )
    FOR i := 1 TO nAreas
       FOR j := 1 TO nAItems
          item := QTableWidgetItem( Hex2Str( arr[ ++n ] ) )
-         IF i == 1 .AND. j == 1
-            IF Left(item:text(),1) == "*"
-               cAlias := Right(item:text(), Len(item:text()) - 1)
-            ELSE
-               cAlias = item:text()
-            ENDIF
-         ENDIF
          ::oUI:tableOpenTables:setItem( i - 1, j - 1, item )
       NEXT
    NEXT
@@ -876,11 +869,7 @@ METHOD clsDebugger:showAreas( arr, n )
       ::oUI:tableCurrentRecord:setRowCount( 0 )
    ELSE
       ::oUI:tableOpenTables:setCurrentCell( 0, 0 )
-      ::nRowAreas := 0
-      ::setMode( MODE_INPUT )
-      ::doCommand(CMD_REC,cAlias)
-      ::wait4connection( "valuerec" )
-      ::timerProc()
+      ::requestRecord( 0, 0 )
    ENDIF
 
    RETURN NIL
