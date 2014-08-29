@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 9 2014-08-28 21:31:01Z alex; $
+ * $Id: debugger.prg 11 2014-08-29 07:26:36Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -106,7 +106,7 @@ CLASS clsDebugger INHERIT IdeObject
    
    DATA   nRowWatch
    
-   DATA   nRowAreas                               INIT 0
+   DATA   nRowAreas                               INIT -1
 
    DATA   aSources
    DATA   oOutputResult
@@ -1073,6 +1073,7 @@ METHOD clsDebugger:ui_init()
    ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
    ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject(.T.) } )
    ::oUI:connect( QEvent_Close   , {|| ::exitDbg() } )
+
    RETURN NIL
 
 
@@ -1108,6 +1109,9 @@ METHOD clsDebugger:ui_load()
    ENDIF
    
    ::doCommand( CMD_WATCH, "on")
+   
+   ::nRowAreas := - 1
+   
    RETURN NIL
 
 
@@ -1177,6 +1181,7 @@ METHOD clsDebugger:terminateDebug()
 
 METHOD clsDebugger:requestRecord( row, col )
    LOCAL item, cAlias
+
    HB_SYMBOL_UNUSED( col )
    IF row == ::nRowAreas
       RETURN NIL
