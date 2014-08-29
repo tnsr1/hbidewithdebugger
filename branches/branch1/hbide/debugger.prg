@@ -1069,7 +1069,6 @@ METHOD clsDebugger:ui_init()
 
    ::oUI:btnAddExpression:connect( "clicked()", { || ::ui_tableWatch_ins() } )
    ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
-   ::oUI:btnDeleteExpression:connect( "clicked()", { || ::ui_tableWatch_del() } )
    ::oUI:tableWatchExpressions:connect( "itemChanged(QTableWidgetItem*)", { | item | ::changeWatch( item ) } )
    ::oUI:tableOpenTables:connect( "cellActivated(int,int)", { | row, col | ::requestRecord( row, col ) } )   
    ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject(.T.) } )
