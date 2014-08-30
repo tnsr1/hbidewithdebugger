@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 13 2014-08-29 16:53:08Z alex; $
+ * $Id: debugger.prg 14 2014-08-30 15:07:18Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -103,11 +103,14 @@
 CLASS clsDebugger INHERIT IdeObject
 
    DATA   oIde
-   
+
+   DATA   lLoaded                                 INIT .F.
    DATA   nRowWatch
    
    DATA   nRowAreas                               INIT -1
 
+   DATA   nRequestedVarsIndex                     INIT 0
+   
    DATA   aSources
    DATA   oOutputResult
 
@@ -184,6 +187,8 @@ CLASS clsDebugger INHERIT IdeObject
    METHOD terminateDebug()
    METHOD exitDbg()
 
+   METHOD requestVars(index)
+   
    ENDCLASS
 
 
@@ -1064,30 +1069,51 @@ METHOD clsDebugger:ui_init()
    ::oUI:btnInspect:connect( "clicked()", { || ::inspectObject(.T.) } )
    ::oUI:connect( QEvent_Close   , {|| ::exitDbg() } )
 
+   ::oUI:tabWidget:connect( "currentChanged(int)", { |index| ::requestVars(index) })
    RETURN NIL
 
 
+METHOD clsDebugger:requestVars(index)
+
+   IF ::oUi:labelStatus:text() != "Stoped"
+      RETURN NIL
+   ENDIF
+
+   ::setMode( MODE_INPUT )
+   DO CASE
+   CASE index = 0
+      ::doCommand( CMD_LOCAL, "on" )
+      ::wait4connection( "valuelocal" )
+   CASE index = 1
+      ::doCommand( CMD_PRIV, "on" )
+      ::wait4connection( "valuepriv" )
+   CASE index = 2
+      ::doCommand( CMD_PUBL, "on" )
+      ::wait4connection( "valuepubl" )
+   CASE index = 3
+      ::doCommand( CMD_STATIC, "on" )
+      ::wait4connection( "valuestatic" )
+   ENDCASE
+   ::timerProc()
+
+   RETURN NIL
+   
+   
 METHOD clsDebugger:ui_load()
-   ::setMode( MODE_INPUT )
-   ::doCommand( CMD_STACK, "on" )
-   ::wait4connection( "stack" )
-   ::timerProc()
-   ::setMode( MODE_INPUT )
-   ::doCommand( CMD_LOCAL, "on" )
-   ::wait4connection( "valuelocal" )
-   ::timerProc()
-   ::setMode( MODE_INPUT )
-   ::doCommand( CMD_PRIV, "on" )
-   ::wait4connection( "valuepriv" )
-   ::timerProc()
-   ::setMode( MODE_INPUT )
-   ::doCommand( CMD_PUBL, "on" )
-   ::wait4connection( "valuepubl" )
-   ::timerProc()
-   ::setMode( MODE_INPUT )
-   ::doCommand( CMD_STATIC, "on" )
-   ::wait4connection( "valuestatic" )
-   ::timerProc()
+   IF ! ::lLoaded
+      ::setMode( MODE_INPUT )
+      ::doCommand( CMD_STACK, "on" )
+      ::wait4connection( "stack" )
+      ::timerProc()
+  
+      ::requestVars(::oUI:tabWidget:currentIndex())
+      
+      ::lLoaded := .T.
+   ENDIF
+   
+   IF ::nRequestedVarsIndex != ::oUI:tabWidget:currentIndex()
+      ::requestVars(::oUI:tabWidget:currentIndex())
+   Endif
 
    ::setMode( MODE_INPUT )
    ::doCommand( CMD_AREA )
@@ -1101,7 +1127,7 @@ METHOD clsDebugger:ui_load()
    ::doCommand( CMD_WATCH, "on")
    
    ::nRowAreas := - 1
-   
+
    RETURN NIL
 
 
@@ -1172,6 +1198,10 @@ METHOD clsDebugger:terminateDebug()
 METHOD clsDebugger:requestRecord( row, col )
    LOCAL item, cAlias
 
+   IF ::oUi:labelStatus:text() != "Stoped"
+      RETURN NIL
+   ENDIF
+   
    HB_SYMBOL_UNUSED( col )
    IF row == ::nRowAreas
       RETURN NIL
