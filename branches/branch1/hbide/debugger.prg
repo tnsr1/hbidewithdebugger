@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 18 2014-08-30 23:08:45Z alex; $
+ * $Id: debugger.prg 18 2014-08-31 00:54:08Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -1036,6 +1036,9 @@ METHOD clsDebugger:ui_init()
       :append( "EOF" )
       :append( "FOUND" )
       :append( "DEL" )
+      :append( "Filter" )
+      :append( "TagName" )
+      :append( "IndexCondition" )
    ENDWITH
    ::oUI:tableOpenTables:setHorizontalHeaderLabels( oHeaders )
    
