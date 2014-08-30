@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 14 2014-08-30 15:07:18Z alex; $
+ * $Id: debugger.prg 15 2014-08-30 15:10:08Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -1109,11 +1109,11 @@ METHOD clsDebugger:ui_load()
       ::requestVars(::oUI:tabWidget:currentIndex())
       
       ::lLoaded := .T.
+   ELSE
+      IF ::nRequestedVarsIndex != ::oUI:tabWidget:currentIndex()
+         ::requestVars(::oUI:tabWidget:currentIndex())
+      ENDIF
    ENDIF
-   
-   IF ::nRequestedVarsIndex != ::oUI:tabWidget:currentIndex()
-      ::requestVars(::oUI:tabWidget:currentIndex())
-   Endif
 
    ::setMode( MODE_INPUT )
    ::doCommand( CMD_AREA )
