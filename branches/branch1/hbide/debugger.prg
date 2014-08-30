@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 15 2014-08-30 15:10:08Z alex; $
+ * $Id: debugger.prg 16 2014-08-30 15:14:28Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -1079,6 +1079,8 @@ METHOD clsDebugger:requestVars(index)
       RETURN NIL
    ENDIF
 
+   ::nRequestedVarsIndex := index
+   
    ::setMode( MODE_INPUT )
    DO CASE
    CASE index = 0
