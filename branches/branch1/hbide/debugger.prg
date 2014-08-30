@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 17 2014-08-30 19:00:08Z alex; $
+ * $Id: debugger.prg 18 2014-08-30 23:08:45Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -848,14 +848,9 @@ METHOD clsDebugger:showVars( arr, n, nVarType )
 
 METHOD clsDebugger:showWatch( arr, n )
    LOCAL i, nLen := Val( arr[ n ] )
-
-   IF nLen == 1
-      ::oUI:tableWatchExpressions:setItem( ::nRowWatch, 1, QTableWidgetItem(Hex2Str( arr[ ++n ] ) ) )
-   ELSE
-      FOR i := 1 TO nLen
-         ::oUI:tableWatchExpressions:setItem( ::aWatches[i, 1], 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
-      NEXT
-   ENDIF
+   FOR i := 1 TO nLen
+      ::oUI:tableWatchExpressions:setItem( ::aWatches[i, 1], 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+   NEXT
    RETURN NIL
 
 
@@ -1136,21 +1131,43 @@ METHOD clsDebugger:ui_load()
 
 
 METHOD clsDebugger:ui_tableWatch_ins()
-   ::oUI:tableWatchExpressions:insertRow( ::oUI:tableWatchExpressions:rowCount() )
-   AAdd( ::aWatches, { ::oUI:tableWatchExpressions:rowCount() - 1, "" } )
+   LOCAL i, item
+   FOR i := 1 TO ::oUI:tableWatchExpressions:rowCount()
+      item := ::oUI:tableWatchExpressions:item(i - 1, 0)
+      IF item == NIL .OR. Empty(item:text())
+         EXIT
+      ENDIF
+   NEXT
+   IF i > ::oUI:tableWatchExpressions:rowCount()
+      ::oUI:tableWatchExpressions:insertRow( ::oUI:tableWatchExpressions:rowCount() )
+      AAdd( ::aWatches, { ::oUI:tableWatchExpressions:rowCount() - 1, "" } )
+   ENDIF
    RETURN NIL
 
 
 METHOD clsDebugger:ui_tableWatch_del()
    LOCAL i
    LOCAL r := ::oUI:tableWatchExpressions:currentRow()
-   local ri := 0
+   LOCAL ri := 0
+   LOCAL nEmptyNames := 0
 
+   IF r < 0 
+      RETURN NIL
+   ENDIF
+   
+   FOR i := 0 TO r
+      IF Empty(::aWatches[i+1, 2])
+         nEmptyNames++
+      ENDIF
+   NEXT
+   
    FOR i := 1 TO Len( ::aWatches )
       IF ::aWatches[i,1] == r
          ri := i
-         ::setMode( MODE_INPUT )
-         ::doCommand( CMD_WATCH, "del", LTrim( Str( i ) ) )
+         IF ! Empty(::aWatches[i,2])
+            ::setMode( MODE_INPUT )
+            ::doCommand( CMD_WATCH, "del", LTrim( Str( i - nEmptyNames ) ) )
+         ENDIF
       ENDIF
       IF ::aWatches[ i,1 ] > r
          --::aWatches[ i,1 ]
@@ -1166,29 +1183,42 @@ METHOD clsDebugger:ui_tableWatch_del()
 METHOD clsDebugger:changeWatch( item )
    LOCAL i
    LOCAL r := 0
+   LOCAL nEmptyNames := 0
 
    IF item:column() == 0
       ::qTimer:stop()
       ::nRowWatch := item:Row()
+      FOR i := 0 TO ::nRowWatch
+         IF Empty(::aWatches[i+1, 2])
+            nEmptyNames++
+         ENDIF
+      NEXT
       FOR i := 1 TO Len( ::aWatches )
-         IF ::aWatches[ i,1 ] == ::nRowWatch
-            IF Empty( ::aWatches[ i,2 ] )
-               ::aWatches[ i,2 ] := item:text()
+         IF ::aWatches[ i, 1 ] == ::nRowWatch
+            IF Empty(item:text())
+               item:setText(::aWatches[ i, 2 ])
+               RETURN NIL
+            ENDIF
+            IF Empty( ::aWatches[ i, 2 ] )
+               ::aWatches[ i, 2 ] := item:text()
             ELSE
                r := i
                ::setMode( MODE_INPUT )
-               ::doCommand( CMD_WATCH, "del", Ltrim( Str( i ) ) )
+               ::doCommand( CMD_WATCH, "del", Ltrim( Str( i - nEmptyNames ) ) )
                ::wait4connection( "b"+LTrim(Str(::nId1)) )
             ENDIF
         ENDIF
       NEXT
-      IF r > 0
-         hb_ADel( ::aWatches, r, .T. )
-         AAdd( ::aWatches, { ::nRowWatch, item:text() } )
+      IF ! Empty(item:text())
+         IF r > 0
+            hb_ADel( ::aWatches, r, .T. )
+            AAdd( ::aWatches, { ::nRowWatch, item:text() } )
+         ENDIF
+         ::setMode( MODE_INPUT )
+         ::doCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
+      ELSE
+         ::aWatches[r,2] := ""
       ENDIF
-
-      ::setMode( MODE_INPUT )
-      ::doCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
       ::qTimer:start()
    ENDIF
    RETURN NIL
