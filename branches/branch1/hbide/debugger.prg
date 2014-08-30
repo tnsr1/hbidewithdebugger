@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 16 2014-08-30 15:14:28Z alex; $
+ * $Id: debugger.prg 17 2014-08-30 19:00:08Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -539,13 +539,15 @@ METHOD clsDebugger:dbgRead()
 METHOD clsDebugger:Send( ... )
    LOCAL i
    LOCAL arr := hb_aParams()
-   LOCAL s := ""
+   LOCAL s := "", s2
 
    FSeek( ::handl1, 0, 0 )
    FOR i := 1 TO Len( arr )
       s += arr[ i ] + ","
    NEXT
-   FWrite( ::handl1, LTrim( Str( ++::nId1 ) ) + "," + s + LTrim( Str( ::nId1 ) ) + ",!" )
+   s2 :=  LTrim( Str( ++::nId1 ) ) + "," + s + LTrim( Str( ::nId1 ) ) + ",!" 
+//   ?s2
+   FWrite(::handl1, s2)
    RETURN NIL
 
 
@@ -851,7 +853,7 @@ METHOD clsDebugger:showWatch( arr, n )
       ::oUI:tableWatchExpressions:setItem( ::nRowWatch, 1, QTableWidgetItem(Hex2Str( arr[ ++n ] ) ) )
    ELSE
       FOR i := 1 TO nLen
-         ::oUI:tableWatchExpressions:setItem( i - 1, 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
+         ::oUI:tableWatchExpressions:setItem( ::aWatches[i, 1], 1, QTableWidgetItem( Hex2Str( arr[ ++n ] ) ) )
       NEXT
    ENDIF
    RETURN NIL
@@ -1163,30 +1165,31 @@ METHOD clsDebugger:ui_tableWatch_del()
 
 METHOD clsDebugger:changeWatch( item )
    LOCAL i
-   LOCAL rc := ::oUI:tableWatchExpressions:rowCount()
    LOCAL r := 0
 
    IF item:column() == 0
+      ::qTimer:stop()
+      ::nRowWatch := item:Row()
       FOR i := 1 TO Len( ::aWatches )
-         IF ::aWatches[ i,1 ] == item:row()
+         IF ::aWatches[ i,1 ] == ::nRowWatch
             IF Empty( ::aWatches[ i,2 ] )
                ::aWatches[ i,2 ] := item:text()
-               ::nRowWatch := item:Row()
             ELSE
+               r := i
                ::setMode( MODE_INPUT )
                ::doCommand( CMD_WATCH, "del", Ltrim( Str( i ) ) )
-               ::wait4connection( "ok" )
-               r := i
-               ::nRowWatch := rc - 1
+               ::wait4connection( "b"+LTrim(Str(::nId1)) )
             ENDIF
         ENDIF
       NEXT
       IF r > 0
-         AAdd( ::aWatches, { rc - 1, item:text() } )
          hb_ADel( ::aWatches, r, .T. )
+         AAdd( ::aWatches, { ::nRowWatch, item:text() } )
       ENDIF
+
       ::setMode( MODE_INPUT )
       ::doCommand( CMD_WATCH, "add", Str2Hex( item:text() ) )
+      ::qTimer:start()
    ENDIF
    RETURN NIL
 
