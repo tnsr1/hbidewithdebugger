@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 19 2014-08-31 16:38:54Z alex; $
+ * $Id: debugger.prg 20 2014-08-31 16:50:25Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -275,7 +275,7 @@ METHOD clsDebugger:LoadBreakPoints()
    FOR j := 1 TO Len( ::aSources )
       FOR i := 1 TO Len( ::aTabs )
          oEditor := ::aTabs[ i, TAB_OEDITOR ]
-         IF oEditor:oTab:caption == ::aSources[ j ]
+         IF oEditor:cPath + oEditor:cFile + oEditor:cExt == ::cCurrProjPath + ::aSources[ j ]
             cBP := oEditor:qCoEdit:qEdit:getBreakPointsVector()
             IF ! Empty( cBP )
                DO WHILE .T.
