@@ -1,5 +1,5 @@
 /*
- * $Id: debugger.prg 18 2014-08-31 00:54:08Z alex; $
+ * $Id: debugger.prg 19 2014-08-31 16:38:54Z alex; $
  */
 
 /* this file adapted FOR hbide from hwgdebug.prg by alex;(Alexey Zapolskiy(pepan@mail.ru))
@@ -145,6 +145,7 @@ CLASS clsDebugger INHERIT IdeObject
    DATA   oUI
    
    DATA   cCurrentProject
+   DATA   cCurrProjPath
 
    METHOD init( oIde )
    METHOD start( cExe )
@@ -738,12 +739,12 @@ METHOD clsDebugger:getCurrPrgName()
 
 METHOD clsDebugger:setWindow( cPrgName )
    LOCAL qCursor
-   LOCAL i, oEditor
+   LOCAL i
 
-   FOR i := 1 TO Len(::aTabs)
-      oEditor := ::aTabs[ i, TAB_OEDITOR ]
-      IF (oEditor:cFile + oEditor:cExt) == cPrgName
-         cPrgName := oEditor:cPath + oEditor:cFile + oEditor:cExt
+   FOR i := 1 TO Len(::aSources)
+
+      IF At(cPrgName, ::aSources[i]) > 0
+         cPrgName := ::cCurrProjPath + ::aSources[i]
          EXIT
       ENDIF
    NEXT i
